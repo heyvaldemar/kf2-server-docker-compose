@@ -1,0 +1,118 @@
+# Image pin lives HERE, as an interpolation default, so `git pull` (or
+# re-downloading this file) delivers the exact image this repository has
+# tested. Set KF2_SERVER_IMAGE_VERSION in .env to run a different tag while
+# the digest for it is fetched normally, or KF2_SERVER_IMAGE_TAG to replace
+# the whole reference. CI (the Trivy scan and check-pin-freshness) reads the
+# pin from this line: this block is the single source of truth.
+#
+# ONE TAG PER GAME in this image: LinuxGSM publishes kf2, cs2, ark and a
+# hundred others under the same name, so the tag IS the game and carries no
+# version. The digest is the version; the image rebuilds weekly, the daily
+# freshness job goes red when it does, and the pin moves deliberately.
+x-images:
+  kf2-server: &kf2-server-image ${KF2_SERVER_IMAGE_TAG:-gameservermanagers/gameserver:${KF2_SERVER_IMAGE_VERSION:-kf2@sha256:5a5c228f005917e1d53d00cc7e5e99ce0a1b99f07edd6c63051aca65f9b1a98d}}
+
+services:
+  kf2-server:
+    image: *kf2-server-image
+    # Handles untrusted input from the internet and cannot gain privileges
+    # through a setuid binary.
+    security_opt:
+      - no-new-privileges:true
+    # Killing Floor 2 is heavier than a Source server: six players, Unreal
+    # Engine 3, and LinuxGSM runs SteamCMD inside the same container on every
+    # update. 4g on the machine this template comes from; raise it when a
+    # report shows it near the ceiling rather than guessing high now.
+    deploy:
+      resources:
+        limits:
+          memory: ${KF2_SERVER_MEMORY_LIMIT:-4g}
+          cpus: "${KF2_SERVER_CPU_LIMIT:-2.0}"
+        reservations:
+          memory: ${KF2_SERVER_MEMORY_RESERVATION:-1g}
+          cpus: "${KF2_SERVER_CPU_RESERVATION:-0.5}"
+    ports:
+      # THE QUERY PORT MUST CARRY THE SAME NUMBER INSIDE AND OUTSIDE. Steam
+      # records a server by the port the server BINDS, not the one a router
+      # publishes. A first version kept 27015 inside and published it as 27020
+      # because another game held 27015 outside — and nobody could join: Steam's
+      # directory pointed clients at 27015, where the other game answered. The
+      # game connection reached 7777 correctly, the Steam handshake then failed
+      # against a different game, and the server logged "Add unverified
+      # connection" followed one second later by "clean up connection by
+      # handshake timeout". Direct A2S worked throughout, which is exactly what
+      # made it look like a client-side problem. Change the query port in
+      # config/kf2server.cfg AND here, never in only one place.
+      - "${KF2_SERVER_GAME_PORT:-7777}:${KF2_SERVER_GAME_PORT:-7777}/udp"
+      - "${KF2_SERVER_QUERY_PORT:-27015}:${KF2_SERVER_QUERY_PORT:-27015}/udp"
+      - "${KF2_SERVER_STEAM_PORT:-20560}:${KF2_SERVER_STEAM_PORT:-20560}/udp"
+      # WEBADMIN, BOUND TO LOCALHOST. Killing Floor 2 has no rcon: this small
+      # web application is the entire administrative interface, so publishing
+      # it to the internet puts a login form guarding a reconfigurable game
+      # server on the open internet. It answers on this host only unless
+      # KF2_SERVER_WEBADMIN_BIND says otherwise — set that to a LAN address,
+      # never to 0.0.0.0.
+      - "${KF2_SERVER_WEBADMIN_BIND:-127.0.0.1}:${KF2_SERVER_WEBADMIN_PORT:-8080}:8080/tcp"
+    environment:
+      # The image bakes GAMESERVER=kf2server, UID/GID 1000 and the /data layout;
+      # named anyway so the contract is visible without docker inspect.
+      GAMESERVER: kf2server
+      UID: "${KF2_SERVER_UID:-1000}"
+      GID: "${KF2_SERVER_GID:-1000}"
+      TZ: ${KF2_SERVER_TIMEZONE:-UTC}
+    volumes:
+      # EVERYTHING LIVES HERE: server files, LinuxGSM's state, logs and saves.
+      # The image carries none of it, so this volume IS the server — about
+      # 25 GB that SteamCMD fetches on first start.
+      - kf2-server-data:/data
+      # THE SETTINGS LIVE OUTSIDE THE VOLUME, where git records their history
+      # and a backup that skips 25 GB of replaceable game files still sees them.
+      # LinuxGSM reads this file at start; the file it ships beside it,
+      # _default.cfg, is overwritten on every update and says so at the top.
+      - ./config/kf2server.cfg:/data/config-lgsm/kf2server/kf2server.cfg
+    healthcheck:
+      # THE GAME, NOT THE WRAPPER. A first version of this also accepted
+      # `pgrep -f kf2server`, which matches LinuxGSM's own supervising script —
+      # so the container reported HEALTHY while SteamCMD was still downloading
+      # twenty-five gigabytes and no server existed at all. A check that passes
+      # before the thing it checks exists is worse than none, because it is
+      # believed. KFGameSteamServer.bin is the actual server binary.
+      #
+      # THE BRACKET IS LOAD-BEARING. Without it this check passed for every
+      # pattern ever given to it — including one naming a process that does not
+      # exist — because `pgrep -f` searches full command lines and the shell
+      # running the check has the pattern in its own. Measured in this
+      # container: `pgrep -f "ZZZ_no_such_process"` exits 0; with the first
+      # letter in a character class it exits 1. A server crashed with a core
+      # dump, two people were dropped mid-game, and this reported HEALTHY for
+      # the whole of it. tests/e2e-healthcheck.sh proves the bracket against a
+      # real container.
+      test: ["CMD-SHELL", "pgrep -f '[K]FGameSteamServer.bin' >/dev/null"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      # A FULL INSTALL, NOT A RESTART. An empty volume means SteamCMD fetches
+      # the whole game; the first install took about ten minutes on a fast link
+      # and a verify pass can take longer. Fifteen minutes was cutting it fine
+      # enough to raise a false alarm.
+      start_period: ${KF2_SERVER_START_PERIOD:-60m}
+    # Unreal Engine writes its state on the way out; ten seconds and a SIGKILL
+    # loses the map's progress and can leave LinuxGSM's own lock behind.
+    stop_grace_period: ${KF2_SERVER_STOP_GRACE_PERIOD:-60s}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: ${KF2_SERVER_LOG_MAX_SIZE:-10m}
+        max-file: "${KF2_SERVER_LOG_MAX_FILE:-3}"
+
+# DECLARED EXTERNAL SO `docker compose down -v` CANNOT DELETE IT.
+#
+# Twenty-five gigabytes that SteamCMD downloaded once, plus the server's own
+# state. As a project-managed volume it is one `down -v` away from being gone —
+# and `down -v` is the command everybody reaches for when a stack misbehaves.
+# Create it before the first start:  docker volume create kf2-server-data
+volumes:
+  kf2-server-data:
+    name: kf2-server-data
+    external: true
