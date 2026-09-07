@@ -9,14 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(no unreleased changes yet)_
 
-## [1.0.0] - 2026-09-07
+## [1.1.0] - 2026-09-07
 
 ### Added
 
-- **A Killing Floor 2 co-op server on LinuxGSM**, image pinned by digest as an
-  interpolation default, so `git pull` delivers the build this repository has
-  tested and `.env` overrides survive it. The tag is the game's name because
-  LinuxGSM publishes every game under one image and no version: the digest is
+- **`update.sh`: move between release tags on purpose.** It updates to the latest release (a combination this repository's CI has booted and smoke-tested), refuses to cross a major version unattended, refuses to run over local changes, and names any new required variable before anything has moved. `--dry-run` says what would happen.
+
+
   the version.
 - **The query port carried under the same number inside and out**, written in
   both the instance config and the compose file, with the evening it cost
@@ -45,5 +44,6 @@ _(no unreleased changes yet)_
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/releases/tag/v1.0.0

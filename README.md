@@ -57,7 +57,7 @@ If you run this at home and want nothing listening on your router, put the game 
 
 ## Updating
 
-The pin lives in the `x-images` block at the top of the compose file, as an interpolation default, so a `git pull` delivers the image this repository has tested. The tag is the game's name because LinuxGSM publishes every game under one image name and no version: the digest is the version, the image rebuilds weekly, and the daily freshness check goes red when it does. The game itself updates through SteamCMD inside the volume, on `./kf2server update` or at start.
+The pin lives in the `x-images` block at the top of the compose file, as an interpolation default, so a `git pull` delivers the image this repository has tested. The tag is the game's name because LinuxGSM publishes every game under one image name and no version: the digest is the version, the image rebuilds weekly, and the daily freshness check goes red when it does. The game itself updates through SteamCMD inside the volume, on `./kf2server update` or at start. `./update.sh` does that on purpose: it moves to the latest release tag, refuses to cross a major unattended, and names any new required variable before anything has moved.
 
 ## Testing
 
