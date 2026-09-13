@@ -26,7 +26,7 @@ env:
 
 jobs:
   lint:
-    name: Lint workflow YAML
+    name: Lint shell scripts and workflow YAML
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -34,6 +34,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: ShellCheck
+        # Pinned, and the same image a maintainer runs locally: Ubuntu's
+        # packaged shellcheck is a different version with different defaults.
+        run: |
+          docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.11.0 \
+            tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-listed.sh \
+            tests/e2e-healthcheck.sh tests/e2e-moderation.sh update.sh
 
       - name: actionlint (GitHub Actions workflow linting)
         run: |
@@ -167,12 +175,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: ShellCheck
-        # Pinned, and the same image a maintainer runs locally: Ubuntu's
-        # packaged shellcheck is a different version with different defaults.
-        run: |
-          docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.11.0 tests/e2e-healthcheck.sh
-
       - name: Prove the exact match catches what a substring match misses
         # Assertions against a real container, with no game download: two
         # processes named cs2 and cs2.sh are the whole fixture. The game is
@@ -188,3 +190,28 @@ jobs:
           sed -E 's/^([A-Z0-9_]+)=$/\1=ci-placeholder/' .env.example > .env
           docker compose -f kf2-server-docker-compose.yml config >/dev/null
           echo "compose OK"
+
+  moderation:
+    name: Moderation without rcon, against the pinned image
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Stop, edit, start, read back; queue while busy; silence is not empty
+        # The game cannot boot here, so the ban cycle is run against the
+        # pinned image with tests/fixtures/fake-kf2.py on the query port
+        # where the game would be: the same python3 the tools use, the same
+        # volume layout, the same `docker compose stop`, `run` and `exec`.
+        # Every rule the tools rest on is asserted, negatives included: the
+        # wrong id is refused, the busy server is not restarted, the silent
+        # one is not restarted, an id the server drops is reported as
+        # dropped, a missing section is reported and the server started
+        # again, CRLF stays CRLF, and a webhook nobody answers fails the run.
+        run: |
+          chmod +x tests/e2e-moderation.sh
+          ./tests/e2e-moderation.sh

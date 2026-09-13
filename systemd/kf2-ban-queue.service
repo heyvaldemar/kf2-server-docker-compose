@@ -1,0 +1,16 @@
+[Unit]
+Description=Apply Killing Floor 2 bans that had to wait for an empty server
+Documentation=https://github.com/heyvaldemar/kf2-server-docker-compose#moderation-without-rcon
+
+[Service]
+Type=oneshot
+# Where this repository is checked out. The script finds the compose file,
+# .env and the queue from there.
+WorkingDirectory=/opt/kf2-server-docker-compose
+ExecStart=/opt/kf2-server-docker-compose/tools/kf2-ban-queue.sh
+# BOUNDED, SO A HANG BECOMES A FAILURE. Type=oneshot defaults to
+# TimeoutStartSec=infinity: a run that wedges would stay "activating" for
+# ever, never fail, and never appear in `systemctl --failed`. A ban applies in
+# about a minute, with a Steam update in the way a few more; fifteen is far
+# above that and far below forever.
+TimeoutStartSec=15m

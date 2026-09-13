@@ -52,6 +52,13 @@ services:
       # server on the open internet. It answers on this host only unless
       # KF2_SERVER_WEBADMIN_BIND says otherwise — set that to a LAN address,
       # never to 0.0.0.0.
+      #
+      # AND ITS PASSWORD STAYS EMPTY. Both times an AdminPassword was set on
+      # the machine this template comes from, the server advertised itself as
+      # password protected and dropped every client that did not answer the
+      # prompt. Nobody can log in to WebAdmin without one, so moderation does
+      # not go through WebAdmin at all: tools/kf2-ban.sh works on the ini the
+      # server rewrites, and the README says how.
       - "${KF2_SERVER_WEBADMIN_BIND:-127.0.0.1}:${KF2_SERVER_WEBADMIN_PORT:-8080}:8080/tcp"
     environment:
       # The image bakes GAMESERVER=kf2server, UID/GID 1000 and the /data layout;
@@ -60,6 +67,14 @@ services:
       UID: "${KF2_SERVER_UID:-1000}"
       GID: "${KF2_SERVER_GID:-1000}"
       TZ: ${KF2_SERVER_TIMEZONE:-UTC}
+      # HOW OFTEN LINUXGSM ASKS STEAM FOR A GAME UPDATE, in minutes. The game
+      # lives in the volume, not the image, so the image can be current while
+      # the game underneath it is weeks behind — and Steam enforces a version
+      # match: the evening a patch ships, every client updates itself and a
+      # server still on the old build stops accepting them, with nothing on
+      # the host to say why. Applying an update restarts the server. 0 turns
+      # the check off.
+      UPDATE_CHECK: "${KF2_SERVER_UPDATE_CHECK:-60}"
     volumes:
       # EVERYTHING LIVES HERE: server files, LinuxGSM's state, logs and saves.
       # The image carries none of it, so this volume IS the server — about

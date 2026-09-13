@@ -1,0 +1,12 @@
+[Unit]
+Description=Apply Killing Floor 2 bans that had to wait for an empty server
+
+[Timer]
+# Every five minutes: a ban is about the next connection, so an hour's wait
+# costs almost nothing, and five minutes is how long a server stays empty
+# before it is worth acting on.
+OnCalendar=*:0/5
+Persistent=no
+
+[Install]
+WantedBy=timers.target

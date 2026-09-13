@@ -1,0 +1,27 @@
+# The stand-in server tests/e2e-moderation.sh runs the moderation tools
+# against: the PINNED IMAGE, the same service name, a volume laid out the way
+# LinuxGSM lays it out, and fake-kf2.py where the game would be. The tools
+# cannot tell the difference, which is the point: they run `docker compose
+# stop`, `run` and `exec` against this file exactly as they do against
+# kf2-server-docker-compose.yml in production.
+services:
+  kf2-server:
+    image: ${KF2_SERVER_IMAGE_TAG:?}
+    user: "1000:1000"
+    entrypoint: ["python3", "/fake-kf2.py"]
+    environment:
+      KF2_FAKE_QUERY_PORT: "27015"
+    volumes:
+      - data:/data
+      - ./fake-kf2.py:/fake-kf2.py:ro
+      - ./LinuxServer-KFGame.ini:/fixture.ini:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '[f]ake-kf2.py' >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 3
+      start_period: 3s
+    stop_grace_period: 10s
+
+volumes:
+  data: {}
