@@ -1,6 +1,7 @@
 # Killing Floor 2 server using Docker Compose
 
 [![Deployment Verification](https://github.com/heyvaldemar/kf2-server-docker-compose/actions/workflows/deployment-verification.yml/badge.svg?branch=main)](https://github.com/heyvaldemar/kf2-server-docker-compose/actions/workflows/deployment-verification.yml)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14892/badge)](https://www.bestpractices.dev/projects/14892)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Killing Floor 2 co-op server on LinuxGSM, pinned by digest, with the port rule that cost an evening, the health check that spent seventeen hours green over a dead server, and moderation for an engine that has no rcon.
