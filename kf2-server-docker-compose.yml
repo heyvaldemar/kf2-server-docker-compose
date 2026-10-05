@@ -103,8 +103,14 @@ services:
       # the whole of it. tests/e2e-healthcheck.sh proves the bracket against a
       # real container.
       test: ["CMD-SHELL", "pgrep -f '[K]FGameSteamServer.bin' >/dev/null"]
-      interval: 60s
-      timeout: 10s
+      # THE INTERVAL TIMES THE RETRIES IS THE FLOOR ON NOTICING A CRASH. At 60s
+      # and three retries a dead server read healthy for three minutes, and a
+      # watchdog polling every two minutes on top of that left a full server
+      # unable to rejoin for four and a half. A missing process is not a signal
+      # that needs debouncing, and pgrep reading /proc costs nothing, so the
+      # floor is now thirty seconds; tests/e2e-healthcheck.sh measures it.
+      interval: 10s
+      timeout: 5s
       retries: 3
       # A FULL INSTALL, NOT A RESTART. An empty volume means SteamCMD fetches
       # the whole game; the first install took about ten minutes on a fast link
