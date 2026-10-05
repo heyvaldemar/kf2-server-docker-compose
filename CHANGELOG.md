@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   process needs no debouncing and `pgrep` costs nothing: `interval: 10s`, `timeout: 5s`, `retries: 3`. `start_period` is unchanged, so
   the first SteamCMD install still has its hour. `tests/e2e-healthcheck.sh` measures it against a fixture whose wrapper outlives the game.
 
+### Fixed
+
+- **`update.sh` stops on a `.env` it cannot read, before the checkout.** It used to fall through: every new required variable read as "not set", or, with none, the tree moved to the new tag and `docker compose up` failed on the permission. Now it names the file, its owner and mode, and changes nothing.
+
 ### Security
 
 - **`gameservermanagers/gameserver:kf2` was rebuilt upstream**; the pin moved from `sha256:788843c1ab39…` to `sha256:31e2aa692321…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.
