@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A crashed server reads unhealthy in thirty seconds, not three minutes.** The health check ran every 60s with three retries, so a dead game
+  stayed healthy for three minutes, and a watchdog polling on top of that left a full server unable to rejoin for longer. A missing
+  process needs no debouncing and `pgrep` costs nothing: `interval: 10s`, `timeout: 5s`, `retries: 3`. `start_period` is unchanged, so
+  the first SteamCMD install still has its hour. `tests/e2e-healthcheck.sh` measures it against a fixture whose wrapper outlives the game.
+
 ### Security
 
 - **`gameservermanagers/gameserver:kf2` was rebuilt upstream**; the pin moved from `sha256:788843c1ab39…` to `sha256:31e2aa692321…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.

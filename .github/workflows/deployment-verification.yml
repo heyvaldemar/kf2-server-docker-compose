@@ -114,7 +114,9 @@ jobs:
         # processes named cs2 and cs2.sh are the whole fixture. The game is
         # killed and the exact check must go red while the substring check
         # stays green - if the substring form ever failed too, the comment in
-        # the compose file would be wrong and the run says so.
+        # the compose file would be wrong and the run says so. Then the shipped
+        # interval and retries are measured: a dead game must read unhealthy
+        # within the floor they set, and the floor must be a minute or less.
         run: |
           chmod +x tests/e2e-healthcheck.sh
           ./tests/e2e-healthcheck.sh
