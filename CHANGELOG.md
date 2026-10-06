@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.2.5] - 2026-10-06
+
 ### Changed
 
 - **A crashed server reads unhealthy in thirty seconds, not three minutes.** The health check ran every 60s with three retries, so a dead game
@@ -149,7 +153,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.2.4...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.2.5...HEAD
+[1.2.5]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.2.1...v1.2.2
