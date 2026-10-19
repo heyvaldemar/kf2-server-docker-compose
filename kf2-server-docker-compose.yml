@@ -10,7 +10,7 @@
 # version. The digest is the version; the image rebuilds weekly, the daily
 # freshness job goes red when it does, and the pin moves deliberately.
 x-images:
-  kf2-server: &kf2-server-image ${KF2_SERVER_IMAGE_TAG:-gameservermanagers/gameserver:${KF2_SERVER_IMAGE_VERSION:-kf2@sha256:e6d43cc5fa427f258671838a849daa263d9fb1e85207f443c3c5d9e35f34f9ef}}
+  kf2-server: &kf2-server-image ${KF2_SERVER_IMAGE_TAG:-gameservermanagers/gameserver:${KF2_SERVER_IMAGE_VERSION:-kf2@sha256:c7f4d92c88fbbb9d687236f8a3247a7a4074fc213c83535c6ca5b631a049125b}}
 
 services:
   kf2-server:
