@@ -253,10 +253,22 @@ fi
 if [ "$apply" != 1 ]; then
   if [ "$ACTION" = add ]; then
     touch "$QUEUE" || exit 1
-    if grep -q "^$SID " "$QUEUE"; then
+    if grep -q "^$SID " "$QUEUE" 2>/dev/null; then
       echo "already queued: $SID, it will be banned when the server empties"
     else
-      printf '%s %s\n' "$SID" "$(date +%s)" >> "$QUEUE"
+      # SAY "QUEUED" ONLY ONCE IT IS WRITTEN AND READ BACK. On the server this
+      # template comes from, a moderation bot said "queued" for five weeks
+      # while every append failed on a read-only mount, and nothing was
+      # recorded. stderr is redirected before the append, so the shell's own
+      # complaint does not get in ahead of this one.
+      if ! printf '%s %s\n' "$SID" "$(date +%s)" 2>/dev/null >> "$QUEUE"; then
+        echo "NOT banned: could not write the ban queue $QUEUE, so nothing was recorded" >&2
+        exit 1
+      fi
+      if ! grep -q "^$SID " "$QUEUE" 2>/dev/null; then
+        echo "NOT banned: $SID did not land in $QUEUE" >&2
+        exit 1
+      fi
       if [ "$why" = "not answering" ]; then
         echo "queued: $SID, the server is not answering (starting, installing, or down), so it is not proven empty; it will be banned when it is"
       else

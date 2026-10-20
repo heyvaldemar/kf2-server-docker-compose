@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Fixed
+
+- **A ban the queue could not record no longer says "queued".** `tools/kf2-ban.sh add` appended to the queue without checking the write and printed "queued: <id>", exit 0, whatever happened. `touch` caught a read-only mount, but not an append that failed after it (a full disk, a path that is a directory). On the server this template comes from, a moderation bot said "queued" for five weeks while every append failed and nothing was recorded. The append is now checked and the id read back; otherwise it says "NOT banned" and exits 1. `tests/e2e-moderation.sh` plants a queue path that is a directory; on the old script that case got exit 0. 47 of 47 now.
+- **The applier says so when it cannot rewrite the queue**, instead of an unchecked `mv`; the applied bans then stay listed and are found already banned on the next run.
 
 ## [1.2.8] - 2026-10-19
 

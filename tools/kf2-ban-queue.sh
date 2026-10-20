@@ -131,7 +131,12 @@ if [ -n "$applied" ]; then
     [ -n "${sid:-}" ] || continue
     printf '%s' "$applied" | grep -q "^$sid " || printf '%s %s\n' "$sid" "$ts" >> "$tmp"
   done < "$QUEUE"
-  mv "$tmp" "$QUEUE"
+  # Checked too: if the rewrite fails, the applied bans stay listed, and the
+  # next run finds them already banned. Harmless, but said.
+  if ! mv "$tmp" "$QUEUE" 2>/dev/null; then
+    echo "could not rewrite the queue $QUEUE: the bans applied below stay listed, and the next run will find them already banned" >&2
+    status=1
+  fi
   echo "applied:"; printf '%s' "$applied"
   notify "Queued Killing Floor 2 ban(s) applied" "The server emptied, so the ban(s) asked for earlier went in and were read back out of the file the server rewrote at startup:
 $(printf '%s' "$applied")

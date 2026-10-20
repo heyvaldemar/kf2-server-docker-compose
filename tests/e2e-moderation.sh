@@ -140,6 +140,20 @@ tools/kf2-ban.sh queue | grep -q "^76561198045356622 " && pass "queue: lists wha
 out=$(tools/kf2-ban-queue.sh --dry-run 2>&1); rc=$?
 [ "$rc" = 0 ] && [ "$out" = "2 player(s) on: 1 ban(s) stay queued" ] && [ "$(starts)" = "$before" ] && pass "the applier with 2 on: '$out'" || fail "applier with players on exited $rc: $out"
 
+# A QUEUE THAT CANNOT BE WRITTEN IS NOT A QUEUED BAN. On the server this
+# template comes from, a moderation bot said "queued" for five weeks while
+# every append to its queue failed on a read-only mount, and nothing was
+# recorded. Here the queue path is a directory: touch accepts it, the append
+# fails, and the tool must say the ban did not happen, with nothing written and
+# nobody restarted.
+mkdir -p "$SCRATCH/queue-is-a-directory"
+out=$(KF2_BAN_QUEUE="$SCRATCH/queue-is-a-directory" tools/kf2-ban.sh add 76561198000000003 2>&1); rc=$?
+if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q "^NOT banned" && ! printf '%s' "$out" | grep -q "^queued" && [ "$(starts)" = "$before" ]; then
+  pass "a queue that cannot be written: 'NOT banned', exit 1, nobody restarted"
+else
+  fail "a queue that cannot be written: exit $rc, said: $out"
+fi
+
 echo; echo "--- an unanswered query is not an empty server"
 fake_set 1 silent
 out=$(tools/kf2-ban-queue.sh 2>&1); rc=$?
