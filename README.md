@@ -100,7 +100,16 @@ If you run this at home and want nothing listening on your router, put the game 
 
 ## Updating
 
-The pin lives in the `x-images` block at the top of the compose file, as an interpolation default, so a `git pull` delivers the image this repository has tested. The tag is the game's name because LinuxGSM publishes every game under one image name and no version: the digest is the version, the image rebuilds weekly, and the daily freshness check goes red when it does. The game itself updates through SteamCMD inside the volume, on `./kf2server update` or at start. `./update.sh` does that on purpose: it moves to the latest release tag, refuses to cross a major unattended, and names any new required variable before anything has moved.
+**The game: `tools/kf2-refresh.sh`, from cron, every hour or so.** Steam enforces a version match, so the evening a patch ships, a server still on the old build turns every player away while its container stays healthy. The script reads the installed and the remote build from LinuxGSM's `check-update`, does nothing while they match, and when the server is behind restarts it, which makes LinuxGSM fetch the new build on start, only if `tools/kf2-a2s.sh` says nobody is on. An unanswered query is not an empty server: it waits and exits 1. `--check` reports, `--dry-run` decides without acting, `--force` restarts whoever is on.
+
+```bash
+# crontab -e
+17 * * * *  cd /opt/kf2-server-docker-compose && tools/kf2-refresh.sh >> /var/log/kf2-refresh.log 2>&1
+```
+
+LinuxGSM's own hourly update is off, on purpose (`UPDATE_CHECK: "0"`). The image's default makes its entrypoint install an hourly `kf2server update` cron job that restarts the server whoever is on. Under this template's `no-new-privileges` that job never installed: crontab is setgid, the hardening ignores the bit, and the install fails with "mkstemp: Permission denied" while the entrypoint carries on as if it had worked. Up to v1.2 this template offered `KF2_SERVER_UPDATE_CHECK=60` for it, a setting that did nothing, so a server between restarts never updated. `tests/e2e-refresh.sh` proves the cause against the pinned image, with and without the hardening.
+
+**The template:** the pin lives in the `x-images` block at the top of the compose file, as an interpolation default, so a `git pull` delivers the image this repository has tested. The tag is the game's name because LinuxGSM publishes every game under one image name and no version: the digest is the version, the image rebuilds weekly, and the daily freshness check goes red when it does. The game itself updates through SteamCMD inside the volume, on `./kf2server update` or at start. `./update.sh` does that on purpose: it moves to the latest release tag, refuses to cross a major unattended, and names any new required variable before anything has moved.
 
 ## Testing
 
@@ -108,7 +117,9 @@ The pin lives in the `x-images` block at the top of the compose file, as an inte
 
 `tests/e2e-moderation.sh` runs the moderation tools against the pinned image, with `tests/fixtures/fake-kf2.py` on the query port where the game would be: the same python3 the tools use in production, a volume laid out the way LinuxGSM lays it out, and the same `docker compose stop`, `run` and `exec` the tools issue against the real compose file. It asserts the whole cycle, negatives included: stop, edit, start, read back; the wrong id refused; a ban queued while people are on and nobody restarted; a silent server not restarted either; the queue applied when the server empties, one restart per ban; an id the server drops at startup reported as dropped; a missing section reported and the server started again; a CRLF file left CRLF; a webhook nobody answers reported and failing the run.
 
-CI runs both on every push alongside shell and workflow linting, a Trivy scan of the pinned image, and a daily check that the pin still resolves to what upstream publishes.
+`tests/e2e-refresh.sh` shows LinuxGSM's own update cron failing to install under `no-new-privileges` and installing without it, the compose file turning it off, and seven decisions of `tools/kf2-refresh.sh` against the same stand-in: up to date, `--check`, players on, a silent server (waits, exit 1), `--force`, an empty server, a build that could not be read. With "cannot count" read as zero instead, the silent case goes ahead.
+
+CI runs all three on every push alongside shell and workflow linting, a Trivy scan of the pinned image, and a daily check that the pin still resolves to what upstream publishes.
 
 CI does not boot the game. The first start is a 25 GB download, and a test that pretends a runner does that in time is a test that never runs.
 

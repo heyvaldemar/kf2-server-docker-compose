@@ -40,8 +40,8 @@ jobs:
         # packaged shellcheck is a different version with different defaults.
         run: |
           docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.11.0 \
-            tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-listed.sh \
-            tests/e2e-healthcheck.sh tests/e2e-moderation.sh update.sh
+            tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-listed.sh tools/kf2-refresh.sh \
+            tests/e2e-healthcheck.sh tests/e2e-moderation.sh tests/e2e-refresh.sh update.sh
 
       - name: actionlint (GitHub Actions workflow linting)
         run: |
@@ -151,3 +151,11 @@ jobs:
         run: |
           chmod +x tests/e2e-moderation.sh
           ./tests/e2e-moderation.sh
+
+      - name: The refresh restarts only an empty server, and LinuxGSM's own cron cannot
+        # Against the same stand-in: up to date, behind with players on,
+        # behind and silent (waits, exit 1), behind and empty. And against the
+        # pinned image: the update cron cannot install under no-new-privileges
+        # and can without it, which is why the compose file turns it off and
+        # tools/kf2-refresh.sh exists.
+        run: ./tests/e2e-refresh.sh

@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Added
+
+- **`tools/kf2-refresh.sh`, an update path that works.** From cron, every hour or so: it reads the installed and the remote build from LinuxGSM's `check-update`, and when the server is behind restarts it so LinuxGSM fetches the new build on start, only if `tools/kf2-a2s.sh` says nobody is on. An unanswered query waits and exits 1. `tests/e2e-refresh.sh` asserts seven decisions against the moderation stand-in; with "cannot count" read as zero, the silent case restarts instead (2 checks fail).
+
+### Fixed
+
+- **`KF2_SERVER_UPDATE_CHECK` never did anything, and is gone.** The image's entrypoint installs LinuxGSM's hourly `kf2server update` cron job from it, and under this template's `no-new-privileges` that install always failed: crontab is setgid, the hardening ignores the bit, "mkstemp: Permission denied", and the entrypoint carried on. A server between restarts never updated, and the evening a patch ships Steam turns every player away from a server on the old build. The compose file now sets `UPDATE_CHECK: "0"` on purpose, so the job stays off the day either side changes, and `tools/kf2-refresh.sh` is the update path. `tests/e2e-refresh.sh` shows the install failing under the hardening and working without it, against the pinned image; it failed first on the old compose file, which did not set 0. Found on the server this template comes from, where the same image ran with the same hardening.
 
 ## [1.2.9] - 2026-10-20
 

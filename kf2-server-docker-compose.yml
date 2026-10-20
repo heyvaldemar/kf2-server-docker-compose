@@ -67,14 +67,19 @@ services:
       UID: "${KF2_SERVER_UID:-1000}"
       GID: "${KF2_SERVER_GID:-1000}"
       TZ: ${KF2_SERVER_TIMEZONE:-UTC}
-      # HOW OFTEN LINUXGSM ASKS STEAM FOR A GAME UPDATE, in minutes. The game
-      # lives in the volume, not the image, so the image can be current while
-      # the game underneath it is weeks behind — and Steam enforces a version
-      # match: the evening a patch ships, every client updates itself and a
-      # server still on the old build stops accepting them, with nothing on
-      # the host to say why. Applying an update restarts the server. 0 turns
-      # the check off.
-      UPDATE_CHECK: "${KF2_SERVER_UPDATE_CHECK:-60}"
+      # LINUXGSM'S OWN HOURLY UPDATE IS OFF, ON PURPOSE. The image's default
+      # (60) makes its entrypoint install an hourly `kf2server update` cron
+      # job, which restarts the server whoever is on. Under no-new-privileges,
+      # above, it never installed at all: crontab is setgid, the hardening
+      # ignores that bit, and the install fails with "mkstemp: Permission
+      # denied" while the entrypoint carries on. Up to v1.2 this line offered
+      # KF2_SERVER_UPDATE_CHECK=60 for it, and it did nothing. Off by accident
+      # is one image change from on, so it is off here by decision, and
+      # tools/kf2-refresh.sh is the update path: it restarts only an empty
+      # server that is behind Steam's build (the game lives in the volume, so
+      # the image can be current while the game is weeks behind, and Steam
+      # turns every player away from a server on the old build).
+      UPDATE_CHECK: "0"
     volumes:
       # EVERYTHING LIVES HERE: server files, LinuxGSM's state, logs and saves.
       # The image carries none of it, so this volume IS the server — about
