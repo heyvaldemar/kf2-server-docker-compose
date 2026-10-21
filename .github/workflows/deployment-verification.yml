@@ -40,8 +40,8 @@ jobs:
         # packaged shellcheck is a different version with different defaults.
         run: |
           docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.11.0 \
-            tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-listed.sh tools/kf2-refresh.sh \
-            tests/e2e-healthcheck.sh tests/e2e-moderation.sh tests/e2e-refresh.sh update.sh
+            tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-idle-reset.sh tools/kf2-listed.sh tools/kf2-refresh.sh \
+            tests/e2e-healthcheck.sh tests/e2e-idle-reset.sh tests/e2e-moderation.sh tests/e2e-refresh.sh update.sh
 
       - name: actionlint (GitHub Actions workflow linting)
         run: |
@@ -159,3 +159,10 @@ jobs:
         # and can without it, which is why the compose file turns it off and
         # tools/kf2-refresh.sh exists.
         run: ./tests/e2e-refresh.sh
+
+      - name: The idle reset restarts only an empty server, closed to takeover or up too long
+        # Against the same stand-in: fourteen decisions of
+        # tools/kf2-idle-reset.sh, both rules restarting it once for real, a
+        # silent server never restarted, and the uptime rule kept off the
+        # takeover rule's loop guard.
+        run: ./tests/e2e-idle-reset.sh

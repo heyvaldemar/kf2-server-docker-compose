@@ -1,3 +1,6 @@
 .env
 .kf2-ban-queue
 .kf2-ban-queue.lock
+.kf2-idle-reset
+.kf2-idle-reset.last
+.kf2-idle-reset.uptime

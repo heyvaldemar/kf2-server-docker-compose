@@ -107,6 +107,17 @@ If you run this at home and want nothing listening on your router, put the game 
 17 * * * *  cd /opt/kf2-server-docker-compose && tools/kf2-refresh.sh >> /var/log/kf2-refresh.log 2>&1
 ```
 
+<a id="when-an-empty-server-is-restarted"></a>**When an empty server is restarted: `tools/kf2-idle-reset.sh`, on a timer, every five minutes.** Two states that only a restart gets a server out of, and in both it acts only on an empty one; an unanswered query waits and exits 1, as above.
+
+- *Closed to takeover.* A matchmaking party can take over an empty server and choose its map, mode and length, which is where a public server gets most of its players. The server advertises whether it may be taken over, and when a party leaves it usually flips back within two minutes. On the server this template comes from it once did not: a party switched it to Versus and left, and it advertised "not available" with every seat open for 21.9 hours. Someone was on in 146 of 271 five-minute samples in the 22.6 hours before, and in 9 of 272 in the same span after. Empty and closed to takeover for 15 minutes (`KF2_IDLE_RESET_AFTER`), it restarts into what `config/kf2server.cfg` says. Closed again within an hour of its own reset, it stops and exits 1: the configured mode is not bringing it back, and a restart every quarter of an hour would hide that.
+- *Up too long.* The two crashes with a log on that server were both the game segfaulting on a map change after a long run, 16 and 12.8 hours, the second with five people on, with memory at about 900 MB of 4 GB both times. Up 8 hours (`KF2_MAX_UPTIME`, seconds; 0 turns it off) and empty for 5 minutes (`KF2_UPTIME_EMPTY_FOR`), it restarts. Two crashes are a hypothesis, not a cause; an empty server loses nothing by a restart, and the crash count over the following weeks is the measure. This rule keeps its own clock, apart from the takeover rule's loop guard, so a party that takes the fresh server and leaves at once is not reported as "closed again".
+
+```bash
+sudo cp systemd/kf2-idle-reset.service systemd/kf2-idle-reset.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now kf2-idle-reset.timer
+tools/kf2-idle-reset.sh --dry-run    # what it would do right now
+```
+
 LinuxGSM's own hourly update is off, on purpose (`UPDATE_CHECK: "0"`). The image's default makes its entrypoint install an hourly `kf2server update` cron job that restarts the server whoever is on. Under this template's `no-new-privileges` that job never installed: crontab is setgid, the hardening ignores the bit, and the install fails with "mkstemp: Permission denied" while the entrypoint carries on as if it had worked. Up to v1.2 this template offered `KF2_SERVER_UPDATE_CHECK=60` for it, a setting that did nothing, so a server between restarts never updated. `tests/e2e-refresh.sh` proves the cause against the pinned image, with and without the hardening.
 
 **The template:** the pin lives in the `x-images` block at the top of the compose file, as an interpolation default, so a `git pull` delivers the image this repository has tested. The tag is the game's name because LinuxGSM publishes every game under one image name and no version: the digest is the version, the image rebuilds weekly, and the daily freshness check goes red when it does. The game itself updates through SteamCMD inside the volume, on `./kf2server update` or at start. `./update.sh` does that on purpose: it moves to the latest release tag, refuses to cross a major unattended, and names any new required variable before anything has moved.
@@ -119,7 +130,9 @@ LinuxGSM's own hourly update is off, on purpose (`UPDATE_CHECK: "0"`). The image
 
 `tests/e2e-refresh.sh` shows LinuxGSM's own update cron failing to install under `no-new-privileges` and installing without it, the compose file turning it off, and seven decisions of `tools/kf2-refresh.sh` against the same stand-in: up to date, `--check`, players on, a silent server (waits, exit 1), `--force`, an empty server, a build that could not be read. With "cannot count" read as zero instead, the silent case goes ahead.
 
-CI runs all three on every push alongside shell and workflow linting, a Trivy scan of the pinned image, and a daily check that the pin still resolves to what upstream publishes.
+`tests/e2e-idle-reset.sh` walks fourteen decisions of `tools/kf2-idle-reset.sh` against the same stand-in, and lets each rule restart it once for real: a quiet server open to takeover, people on, a silent server (exit 1, never restarted), the fifteen-minute and five-minute clocks, the loop guard, the uptime rule off and short of its limit, and the uptime rule's restart leaving the takeover rule's guard alone. With silence read as zero, three checks fail; with the two rules sharing one stamp, two do, the second being the false "closed again".
+
+CI runs all four on every push alongside shell and workflow linting, a Trivy scan of the pinned image, and a daily check that the pin still resolves to what upstream publishes.
 
 CI does not boot the game. The first start is a 25 GB download, and a test that pretends a runner does that in time is a test that never runs.
 

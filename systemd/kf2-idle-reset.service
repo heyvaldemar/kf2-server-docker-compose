@@ -1,0 +1,13 @@
+[Unit]
+Description=Restart an empty Killing Floor 2 server closed to takeover, or up too long
+Documentation=https://github.com/heyvaldemar/kf2-server-docker-compose#when-an-empty-server-is-restarted
+
+[Service]
+Type=oneshot
+# Where this repository is checked out. The script finds the compose file and
+# keeps its clocks (.kf2-idle-reset*) there.
+WorkingDirectory=/opt/kf2-server-docker-compose
+ExecStart=/opt/kf2-server-docker-compose/tools/kf2-idle-reset.sh
+# BOUNDED, SO A HANG BECOMES A FAILURE. A run is a log read, a query and at
+# most one restart; five minutes is far above that and far below forever.
+TimeoutStartSec=5m

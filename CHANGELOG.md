@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Added
+
+- **`tools/kf2-idle-reset.sh`, with `systemd/kf2-idle-reset.timer` every five minutes: a restart for the two states only a restart ends, on an empty server only.** Closed to takeover: the server advertised itself unavailable to matchmaking with every seat open for 21.9 hours once, on the server this template comes from; empty and closed for 15 minutes, it restarts into the configured mode, and closed again within an hour of its own reset it stops and exits 1 instead of looping. Up too long: two crashes there were segfaults on a map change after 16 and 12.8 hours, memory at about 900 MB of 4 GB; up 8 hours and empty for 5 minutes, it restarts, a mitigation on a hypothesis, with its own clock so it never trips the takeover rule's guard. An unanswered player query is never zero: it waits and exits 1. `tests/e2e-idle-reset.sh` asserts fourteen decisions against the moderation stand-in, both rules restarting it once for real; with silence read as zero 3 checks fail, with the two rules sharing a stamp 2 do.
 
 ## [1.3.0] - 2026-10-20
 
