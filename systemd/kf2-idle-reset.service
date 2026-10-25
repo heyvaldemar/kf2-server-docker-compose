@@ -1,5 +1,5 @@
 [Unit]
-Description=Restart an empty Killing Floor 2 server closed to takeover, or up too long
+Description=Restart an empty Killing Floor 2 server closed to takeover
 Documentation=https://github.com/heyvaldemar/kf2-server-docker-compose#when-an-empty-server-is-restarted
 
 [Service]

@@ -80,6 +80,25 @@ services:
       # the image can be current while the game is weeks behind, and Steam
       # turns every player away from a server on the old build).
       UPDATE_CHECK: "0"
+      # NPM DOES NOT WAIT FOR ITS REGISTRY AT START. The image's entrypoint runs
+      # `npm install` in /app/lgsm on every start, for the module LinuxGSM
+      # queries game servers with. The module is already there, "up to date",
+      # but npm still sends its audit request to the registry, and on the
+      # server this template comes from, the night the registry did not answer,
+      # npm waited its default five minutes with the game down and missing from
+      # Steam's list. A start there took twenty minutes before these lines and
+      # twenty-five seconds after. The audit request is the one that waits:
+      # against a registry that never answers, audit off alone finished in a
+      # second, and the update notice off alone was still waiting at sixty.
+      # The rest bound LinuxGSM's own `npm update`, which does need the
+      # registry: cached metadata first, thirty seconds and one retry.
+      # tests/e2e-start.sh measures both against the pinned image.
+      NPM_CONFIG_AUDIT: "false"
+      NPM_CONFIG_FUND: "false"
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+      NPM_CONFIG_PREFER_OFFLINE: "true"
+      NPM_CONFIG_FETCH_TIMEOUT: "30000"
+      NPM_CONFIG_FETCH_RETRIES: "1"
     volumes:
       # EVERYTHING LIVES HERE: server files, LinuxGSM's state, logs and saves.
       # The image carries none of it, so this volume IS the server — about

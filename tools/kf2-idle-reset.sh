@@ -1,15 +1,15 @@
 #!/bin/bash
-# kf2-idle-reset.sh - restart an EMPTY server in the two states where a
+# kf2-idle-reset.sh - restart an EMPTY server in the one state where a
 # restart is the only way back. Run it from a timer, every five minutes.
 #
-#   tools/kf2-idle-reset.sh            restart if one of the rules says so
+#   tools/kf2-idle-reset.sh            restart if the rule says so
 #   tools/kf2-idle-reset.sh --dry-run  go as far as deciding, never restart
 #
 # A server is never restarted with anybody on it, and a player count the
 # query could not read is not zero: tools/kf2-a2s.sh is asked, and silence
 # means "do not touch", exit 1, the same as tools/kf2-refresh.sh.
 #
-# RULE ONE: EMPTY AND CLOSED TO TAKEOVER. Killing Floor 2 lets a matchmaking
+# THE RULE: EMPTY AND CLOSED TO TAKEOVER. Killing Floor 2 lets a matchmaking
 # party take over an empty dedicated server and choose its map, mode,
 # difficulty and length, which is where a public server gets most of its
 # players. The server tells matchmaking whether it may be taken over in its
@@ -24,33 +24,24 @@
 # empty server that is open to takeover is only quiet, and is left alone.
 #
 # A RESET THAT DID NOT TAKE MUST NOT BECOME A LOOP. If the server is empty
-# and closed again within an hour of this rule's last reset, the config is
-# not bringing it back, and restarting every quarter of an hour would hide
-# that. It says so and exits 1 on every run inside that hour, without
-# restarting, so the failed timer is there for somebody to look at.
+# and closed again within an hour of the last reset, the config is not
+# bringing it back, and restarting every quarter of an hour would hide that.
+# It says so and exits 1 on every run inside that hour, without restarting,
+# so the failed timer is there for somebody to look at.
 #
-# RULE TWO: A LONG UPTIME, RESET WHILE NOBODY IS ON. The two crashes with a
-# log on that server were both the game segfaulting on a map change after a
-# long run, 16 h and 12.8 h, the second with five people on, at the same
-# fault address as an older crash nobody had explained. Memory was not the
-# cause: about 900 MB of the 4 GB limit both times. Up KF2_MAX_UPTIME seconds
-# (28800, 8 h, well short of 12.8 h; 0 turns the rule off) and empty for
-# KF2_UPTIME_EMPTY_FOR seconds (300) -> restart. Two crashes are a hypothesis,
-# not a cause: restarting an empty server costs nobody anything, and whether
-# it stops the crashes is for the log to show. It keeps its own clock, apart
-# from rule one's loop guard: a party that took the fresh server and left at
-# once must not read as "closed again after a reset". It cannot loop by
-# itself, because the restart resets the uptime it keys on.
-#
-# "Up" is the container's, from `docker inspect`: a game that crashed and was
-# restarted by Docker counts from the restart. An uptime that cannot be read
-# counts as zero, so the rule waits rather than guesses.
+# A SECOND RULE WAS HERE UP TO v1.4, AND IS GONE. It restarted an empty
+# server after eight hours up, because the two crashes with a log on that
+# server had both been the game segfaulting on a map change after a long run,
+# 16 h and 12.8 h. The third crash came 45 minutes after that rule had
+# restarted the server, so uptime was not the variable, and one restart it
+# ordered had taken twenty minutes to come back (npm, see the compose file).
+# It was removed rather than defended. What was found instead is in
+# config/kf2server.cfg: a directory the Linux server never makes.
 #
 # tests/e2e-idle-reset.sh proves the decisions against the moderation
-# stand-in. Two readings can be supplied instead of asked for:
+# stand-in. One reading can be supplied instead of asked for:
 #   KF2_TAKEOVER  True or False, in place of reading Launch.log; set but
 #                 empty means "not in the log"
-#   KF2_UPTIME    seconds, in place of asking Docker
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -65,8 +56,6 @@ done
 COMPOSE_FILE=${KF2_COMPOSE_FILE:-kf2-server-docker-compose.yml}
 PROJECT=${COMPOSE_PROJECT_NAME:-kf2}
 IDLE=${KF2_IDLE_RESET_AFTER:-900}
-MAX_UP=${KF2_MAX_UPTIME:-28800}
-UP_EMPTY=${KF2_UPTIME_EMPTY_FOR:-300}
 STATE=${KF2_IDLE_RESET_STATE:-.kf2-idle-reset}
 LAUNCH=/data/serverfiles/KFGame/Logs/Launch.log
 compose() { docker compose -f "$COMPOSE_FILE" -p "$PROJECT" "$@"; }
@@ -82,11 +71,8 @@ if [ -n "${KF2_TAKEOVER+x}" ]; then takeable=$KF2_TAKEOVER; else
               | grep -oE '(True|False)' | tail -1)"
 fi
 
-if [ -n "${KF2_UPTIME+x}" ]; then up=$KF2_UPTIME; else
-  started="$(docker inspect -f '{{.State.StartedAt}}' "$id" 2>/dev/null)"
-  since="$(date -u -d "$started" +%s 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%S' "${started%%.*}" +%s 2>/dev/null)"
-  up=$(( $(date +%s) - ${since:-$(date +%s)} ))
-fi
+# The removed uptime rule's clock, left by v1.4 and before.
+rm -f "$STATE.uptime"
 
 players() {
   local n
@@ -99,10 +85,8 @@ restart() {  # why
   say "restarted: $1"
 }
 now=$(date +%s)
-hours() { echo "$(( $1 / 3600 ))h"; }
 
 if [ "$takeable" = False ]; then
-  rm -f "$STATE.uptime"
   n="$(players)"
   if [ "$n" = "?" ]; then say "closed to takeover, and the server did not answer the player query; not acting on a guess" >&2; exit 1; fi
   if [ "$n" -gt 0 ]; then rm -f "$STATE"; say "closed to takeover with $n player(s) on: their game, left alone"; exit 0; fi
@@ -119,17 +103,4 @@ if [ "$takeable" = False ]; then
   exit 0
 fi
 rm -f "$STATE"
-
-if [ "$MAX_UP" -gt 0 ] && [ "$up" -ge "$MAX_UP" ]; then
-  n="$(players)"
-  if [ "$n" = "?" ]; then say "up $(hours "$up"), and the server did not answer the player query; not acting on a guess" >&2; exit 1; fi
-  if [ "$n" -gt 0 ]; then rm -f "$STATE.uptime"; say "up $(hours "$up") with $n player(s) on: waiting for an empty server"; exit 0; fi
-  [ -s "$STATE.uptime" ] || echo "$now" >"$STATE.uptime"
-  empty=$(( now - $(cat "$STATE.uptime") ))
-  if [ "$empty" -lt "$UP_EMPTY" ]; then say "up $(hours "$up"), empty for ${empty}s; restarting after ${UP_EMPTY}s"; exit 0; fi
-  restart "up $(hours "$up") and empty for $(( empty / 60 )) min, ahead of the long-uptime map-change crash" || exit 1
-  $DRY || rm -f "$STATE.uptime"
-  exit 0
-fi
-rm -f "$STATE.uptime"
-say "${takeable:+open to takeover, }up $(hours "$up"): nothing to do"
+if [ -n "$takeable" ]; then say "open to takeover: nothing to do"; else say "no takeover advertisement in the log yet: nothing to do"; fi

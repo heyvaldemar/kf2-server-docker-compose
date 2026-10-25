@@ -41,7 +41,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.11.0 \
             tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-idle-reset.sh tools/kf2-listed.sh tools/kf2-refresh.sh \
-            tests/e2e-healthcheck.sh tests/e2e-idle-reset.sh tests/e2e-moderation.sh tests/e2e-refresh.sh update.sh
+            tests/e2e-healthcheck.sh tests/e2e-idle-reset.sh tests/e2e-moderation.sh tests/e2e-refresh.sh tests/e2e-start.sh update.sh
 
       - name: actionlint (GitHub Actions workflow linting)
         run: |
@@ -160,9 +160,28 @@ jobs:
         # tools/kf2-refresh.sh exists.
         run: ./tests/e2e-refresh.sh
 
-      - name: The idle reset restarts only an empty server, closed to takeover or up too long
-        # Against the same stand-in: fourteen decisions of
-        # tools/kf2-idle-reset.sh, both rules restarting it once for real, a
-        # silent server never restarted, and the uptime rule kept off the
-        # takeover rule's loop guard.
+      - name: The idle reset restarts only an empty server closed to takeover
+        # Against the same stand-in: nine decisions of
+        # tools/kf2-idle-reset.sh, the rule restarting it once for real, a
+        # silent server never restarted, and the uptime rule removed in v1.5
+        # gone, its settings and its clock included.
         run: ./tests/e2e-idle-reset.sh
+
+  start:
+    name: What every start does, against the pinned image
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: KFGame/Cache made once installed and never before; npm does not wait
+        # The image's own entrypoint under no-new-privileges: an installed
+        # layout gets KFGame/Cache as the game's user, the config without the
+        # block gets none, a fresh volume stays to be installed, and without
+        # the guard it would not. Then npm against a registry that accepts and
+        # never answers: done in seconds with the compose file's settings,
+        # still waiting at ninety with npm's defaults.
+        run: ./tests/e2e-start.sh

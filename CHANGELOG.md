@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(no unreleased changes yet)_
 
+## [1.5.0] - 2026-10-25
+
+### Fixed
+
+- **`KFGame/Cache` exists.** The KF2 wiki lists it as a known Linux issue: the server never creates the directory it uses when it loads a map, and it has to exist. On the server this template comes from it was missing while the game segfaulted on three map changes in four days; in the 75 hours after it was made, to 2026-10-25, the game did not crash once. A documented gap closed, not a proven cure. `config/kf2server.cfg` makes it, since LinuxGSM sources that file as the game's user before every command, so it comes back after every reinstall, and only once `KFGame` exists: made before the install, it would make a fresh volume look installed. `tests/e2e-start.sh` shows both through the image's own entrypoint, and that the image does not make it without the block.
+- **A start no longer waits for npm's registry.** The image's entrypoint runs `npm install` on every start, and npm sends its audit request to the registry even when nothing needs installing. The night the registry did not answer, npm waited its default five minutes, and a start took twenty. The compose file now sets `NPM_CONFIG_AUDIT=false` and bounds the rest (`NPM_CONFIG_*`: no fund or update notice, cached metadata first, thirty seconds, one retry); a start took twenty-five seconds after. Against a registry that accepts every connection and never answers, `npm install` finishes in a second with these settings and is still waiting at ninety without them.
+
+### Removed
+
+- **The uptime rule in `tools/kf2-idle-reset.sh`.** Since v1.4.0 it restarted an empty server after eight hours up, because the two crashes with a log had both come on a map change after a long run. The third came 45 minutes after that rule had restarted the server, so uptime was not the variable, and the rule had already cost a twenty-minute outage, the npm wait above. It was removed rather than defended. `KF2_MAX_UPTIME` and `KF2_UPTIME_EMPTY_FOR` now do nothing, and the clock file it kept (`.kf2-idle-reset.uptime`) is removed on the next run. The takeover rule is unchanged.
+
 ## [1.4.1] - 2026-10-24
 
 ### Security
@@ -200,7 +211,8 @@ _(no unreleased changes yet)_
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.2.9...v1.3.0

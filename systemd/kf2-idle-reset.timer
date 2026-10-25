@@ -1,10 +1,10 @@
 [Unit]
-Description=Restart an empty Killing Floor 2 server closed to takeover, or up too long
+Description=Restart an empty Killing Floor 2 server closed to takeover
 
 [Timer]
-# Every five minutes: the rules wait fifteen minutes (closed to takeover) and
-# five (a long uptime) of a server seen empty, so a run every five minutes
-# acts within one period of either.
+# Every five minutes: the rule waits fifteen minutes of a server seen empty
+# and closed to takeover, so a run every five minutes acts within one period
+# of that.
 OnCalendar=*:2/5
 Persistent=no
 
