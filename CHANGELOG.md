@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.6.1] - 2026-10-27
+
 ### Fixed
 
 - **Every script in `tools/` is read whole before it runs.** bash reads a script as it executes it and, after each command, reads on from the same byte offset in whatever the file holds by then. The timers start `tools/kf2-idle-reset.sh` and `tools/kf2-ban-queue.sh` every five minutes, and the queue runs `tools/kf2-ban.sh` for a minute or more; on the server this template comes from, a timer started a script while its file was being edited in place, and the run died on a syntax error. Each script's body is now one brace group, parsed in full before its first line runs, ending in `exit`. `tests/read-whole.sh` checks every script's shape and rewrites the idle reset's file under a running copy: wrapped, it finishes as it started; unwrapped, it runs the new text. A `git pull` or `./update.sh` was never the risk: git writes a new file, which a running copy does not see.
@@ -220,7 +224,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.4.0...v1.4.1
