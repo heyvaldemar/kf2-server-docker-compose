@@ -87,8 +87,22 @@ SILENT_FILE=${KF2_REFRESH_STEAM_SILENT_FILE:-.kf2-refresh-steam-silent}
 TOLERANCE=${KF2_REFRESH_STEAM_TOLERANCE:-10800}
 if [ -n "$installed" ] && [ -z "$latest" ]; then
   now_s=$(date +%s)
+  if [ -L "$SILENT_FILE" ]; then
+    say "$SILENT_FILE is a symlink; not following it, and not tolerating Steam's silence" >&2
+    exit 1
+  fi
   since=$(cat "$SILENT_FILE" 2>/dev/null)
-  case "$since" in ''|*[!0-9]*) since=$now_s; echo "$since" > "$SILENT_FILE" ;; esac
+  case "$since" in ''|*[!0-9]*) since="" ;; esac
+  # A start in the future (a clock set back, a hand-edited file) would keep the
+  # silence young forever, so it starts now instead. And a silence that cannot
+  # be recorded cannot be timed: tolerating it would mean tolerating it forever.
+  if [ -z "$since" ] || [ "$since" -gt "$now_s" ]; then
+    since=$now_s
+    if ! { echo "$since" > "$SILENT_FILE"; } 2>/dev/null; then
+      say "cannot record when Steam went quiet in $SILENT_FILE; not tolerating it" >&2
+      exit 1
+    fi
+  fi
   quiet=$((now_s - since))
   if [ "$quiet" -lt "$TOLERANCE" ]; then
     say "Steam did not say which build it ships (running build $installed); quiet for $((quiet / 60)) min, tolerated up to $((TOLERANCE / 60)) min; nothing changed"

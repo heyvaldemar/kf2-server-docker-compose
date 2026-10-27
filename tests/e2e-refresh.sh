@@ -107,6 +107,15 @@ echo "$(( $(date +%s) - 14400 ))" > "$silent"
 out="$(KF2_BUILDS="100 " KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
 if [ "$rc" = 1 ] && grep -q "for 240 min, past the 180 min tolerance" <<<"$out"; then pass "Steam silent for four hours: exit 1"; else fail "Steam silent past the span: exit $rc, said: $out"; fi
 
+# 9a. A start in the future would keep the silence young forever: it starts now.
+echo "$(( $(date +%s) + 86400 ))" > "$silent"
+out="$(KF2_BUILDS="100 " KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
+if [ "$rc" = 0 ] && grep -q "quiet for 0 min" <<<"$out" && [ "$(cat "$silent")" -le "$(date +%s)" ]; then pass "a start in the future: re-anchored to now"; else fail "future start: exit $rc, said: $out"; fi
+
+# 9b. A silence that cannot be recorded is not tolerated.
+out="$(KF2_BUILDS="100 " KF2_REFRESH_STEAM_SILENT_FILE="/nonexistent-dir/silent" refresh 2>&1)"; rc=$?
+if [ "$rc" = 1 ] && grep -q "cannot record when Steam went quiet" <<<"$out"; then pass "silence that cannot be recorded: exit 1"; else fail "unrecordable silence: exit $rc, said: $out"; fi
+
 # 10. Steam answers again: the span starts over.
 out="$(KF2_BUILDS="100 100" KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
 if [ "$rc" = 0 ] && [ ! -e "$silent" ]; then pass "Steam answers: the silence is forgotten"; else fail "Steam answers: exit $rc, file left: $([ -e "$silent" ] && echo yes), said: $out"; fi
