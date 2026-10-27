@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.6.0] - 2026-10-27
+
 ### Changed
 
 - **`tools/kf2-refresh.sh` tolerates Steam's silence for three hours, not for a number of runs.** When Steam does not say which build it ships, the script used to exit 1 on every run. On the machine this template comes from, Steam stopped answering SteamCMD's build query for about five hours while nothing on the host was wrong; its monitoring tolerated "three failures in a row", written for one caller every three hours, and a second caller landed three strikes in 67 minutes and reported the host down. The script now notes when Steam went quiet in `.kf2-refresh-steam-silent` and exits 0 until it has been quiet for `KF2_REFRESH_STEAM_TOLERANCE` seconds (10800), however often it runs in between, then exits 1; the first answer from Steam starts the span over. An installed build that cannot be read still exits 1 at once. A start time in the future is re-anchored to now, a silence that cannot be recorded is not tolerated, and a symlink in place of the file is refused. `tests/e2e-refresh.sh` shows all three cases.
@@ -214,7 +218,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.3.0...v1.4.0
