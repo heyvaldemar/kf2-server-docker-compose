@@ -34,7 +34,9 @@
 # after any restart, including the one kf2-ban.sh does, so one miss means
 # nothing and this script restarts nothing. The nineteen-hour outage would
 # have shown as miss after miss after miss; anything automated on top of this
-# should wait for several in a row and cap how often it may react. Both CS2
+# should wait until the server has been missing for a span of time with no
+# listed answer in between, not for a number of misses (that number depends
+# on how often something asks), and cap how often it may react. Both CS2
 # servers on that machine flapped in and out of Steam's list three times in
 # an hour once, answering every query throughout, and each restart that
 # followed fixed nothing that was not fixing itself.

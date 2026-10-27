@@ -97,6 +97,20 @@ if [ "$rc" = 0 ] && grep -q "would restart to update (100 -> 101): players onlin
 out="$(KF2_BUILDS="" refresh 2>&1)"; rc=$?
 if [ "$rc" = 1 ] && grep -q "could not read both builds" <<<"$out"; then pass "a build that could not be read: exit 1, nothing changed"; else fail "unreadable build: exit $rc, said: $out"; fi
 
+# 8. Steam silent, the installed build read: tolerated, and the start noted.
+silent="$(mktemp)"; rm -f "$silent"
+out="$(KF2_BUILDS="100 " KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
+if [ "$rc" = 0 ] && grep -q "Steam did not say which build it ships (running build 100); quiet for 0 min, tolerated up to 180 min" <<<"$out" && [ -s "$silent" ]; then pass "Steam silent: tolerated, exit 0, the start noted"; else fail "Steam silent: exit $rc, said: $out"; fi
+
+# 9. However often it runs, the span is what counts: quiet for four hours fails.
+echo "$(( $(date +%s) - 14400 ))" > "$silent"
+out="$(KF2_BUILDS="100 " KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
+if [ "$rc" = 1 ] && grep -q "for 240 min, past the 180 min tolerance" <<<"$out"; then pass "Steam silent for four hours: exit 1"; else fail "Steam silent past the span: exit $rc, said: $out"; fi
+
+# 10. Steam answers again: the span starts over.
+out="$(KF2_BUILDS="100 100" KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
+if [ "$rc" = 0 ] && [ ! -e "$silent" ]; then pass "Steam answers: the silence is forgotten"; else fail "Steam answers: exit $rc, file left: $([ -e "$silent" ] && echo yes), said: $out"; fi
+
 echo
 echo "passed: $PASSED   failed: $FAILED"
 [ "$FAILED" -eq 0 ]

@@ -29,9 +29,23 @@
 # and this exits 1: a probe that can never tell is a probe somebody should
 # look at.
 #
+# STEAM'S SILENCE IS TOLERATED FOR A SPAN OF TIME, NOT A NUMBER OF RUNS. On
+# the machine this template comes from, Steam stopped saying which build it
+# ships for about five hours (SteamCMD timed out on every try) while nothing
+# on the host was wrong. Its monitoring tolerated "three failures in a row",
+# written for one caller every three hours; a second caller made three strikes
+# land in 67 minutes, and it reported the host down. A count assumes a call
+# rate, and the rate changes with whoever asks. So when the installed build
+# reads and Steam's does not, this notes when Steam went quiet and exits 0
+# until it has been quiet for KF2_REFRESH_STEAM_TOLERANCE seconds (three hours
+# by default), however often it runs in between, and 1 after that. An
+# installed build that cannot be read is a fault here, and exits 1 at once.
+#
 # tests/e2e-refresh.sh proves the decisions against the moderation stand-in.
 #   KF2_BUILDS   "<local> <remote>", in place of asking LinuxGSM (tests); set
 #                but empty means "could not be read"
+#   KF2_REFRESH_STEAM_TOLERANCE   seconds of Steam silence before exit 1 (10800)
+#   KF2_REFRESH_STEAM_SILENT_FILE where that silence started (.kf2-refresh-steam-silent)
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -69,10 +83,25 @@ for attempt in 1 2; do
   [ -n "$installed" ] && [ -n "$latest" ] && break
   [ "$attempt" = 1 ] && [ -z "${KF2_BUILDS+x}" ] && sleep 20
 done
+SILENT_FILE=${KF2_REFRESH_STEAM_SILENT_FILE:-.kf2-refresh-steam-silent}
+TOLERANCE=${KF2_REFRESH_STEAM_TOLERANCE:-10800}
+if [ -n "$installed" ] && [ -z "$latest" ]; then
+  now_s=$(date +%s)
+  since=$(cat "$SILENT_FILE" 2>/dev/null)
+  case "$since" in ''|*[!0-9]*) since=$now_s; echo "$since" > "$SILENT_FILE" ;; esac
+  quiet=$((now_s - since))
+  if [ "$quiet" -lt "$TOLERANCE" ]; then
+    say "Steam did not say which build it ships (running build $installed); quiet for $((quiet / 60)) min, tolerated up to $((TOLERANCE / 60)) min; nothing changed"
+    exit 0
+  fi
+  say "Steam has not said which build it ships for $((quiet / 60)) min, past the $((TOLERANCE / 60)) min tolerance (running build $installed); nothing changed" >&2
+  exit 1
+fi
 if [ -z "$installed" ] || [ -z "$latest" ]; then
   say "could not read both builds from LinuxGSM: installed '${installed:-?}', Steam '${latest:-?}'; nothing changed" >&2
   exit 1
 fi
+rm -f "$SILENT_FILE"
 if [ "$installed" = "$latest" ]; then
   say "up to date: build $installed"
   exit 0
