@@ -42,6 +42,18 @@
 # stand-in. One reading can be supplied instead of asked for:
 #   KF2_TAKEOVER  True or False, in place of reading Launch.log; set but
 #                 empty means "not in the log"
+#
+# READ WHOLE BEFORE IT RUNS. bash reads a script as it executes it and, after
+# each command, reads on from the same byte offset in whatever the file holds
+# by then. On the server this template comes from, a timer started a script
+# while its file was being edited in place: a syntax error and a failed
+# unit. The body is one brace group, which bash parses in full before the
+# first line runs, and it ends in exit, so nothing past the closing brace is
+# ever read. Every script in tools/ is built the same way, and
+# tests/read-whole.sh rewrites this file under a running copy both ways. (A
+# git checkout, and so update.sh, writes a new file rather than this one,
+# which a running copy never sees; an editor that saves in place does not.)
+{
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -104,3 +116,5 @@ if [ "$takeable" = False ]; then
 fi
 rm -f "$STATE"
 if [ -n "$takeable" ]; then say "open to takeover: nothing to do"; else say "no takeover advertisement in the log yet: nothing to do"; fi
+exit
+}

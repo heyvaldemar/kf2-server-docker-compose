@@ -41,7 +41,15 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.11.0 \
             tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-idle-reset.sh tools/kf2-listed.sh tools/kf2-refresh.sh \
-            tests/e2e-healthcheck.sh tests/e2e-idle-reset.sh tests/e2e-moderation.sh tests/e2e-refresh.sh tests/e2e-start.sh update.sh
+            tests/e2e-healthcheck.sh tests/e2e-idle-reset.sh tests/e2e-moderation.sh tests/e2e-refresh.sh tests/e2e-start.sh tests/read-whole.sh update.sh
+
+      - name: Every script is read whole before it runs
+        # Timers start the idle reset and the ban queue every five minutes;
+        # bash reads a script as it runs it, so an edit in place mid-run
+        # executes shifted text. The test checks every script in tools/ is one
+        # brace group, and rewrites the idle reset's file under a running
+        # copy, wrapped and unwrapped.
+        run: ./tests/read-whole.sh
 
       - name: actionlint (GitHub Actions workflow linting)
         run: |

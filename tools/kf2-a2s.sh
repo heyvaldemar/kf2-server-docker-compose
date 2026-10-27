@@ -30,6 +30,10 @@
 # NAMES ONLY. A2S does not carry Steam ids, and without WebAdmin there is no
 # other live roster, so `who` cannot hand you the id a ban needs. That comes
 # from the chat log the server writes (see README: "Where the id comes from").
+#
+# Read whole before it runs: one brace group, ending in exit
+# (tools/kf2-idle-reset.sh, "READ WHOLE BEFORE IT RUNS", says why).
+{
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -127,3 +131,5 @@ PY
   *)
     sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
+exit
+}

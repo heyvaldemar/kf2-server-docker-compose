@@ -40,6 +40,10 @@
 # servers on that machine flapped in and out of Steam's list three times in
 # an hour once, answering every query throughout, and each restart that
 # followed fixed nothing that was not fixing itself.
+#
+# Read whole before it runs: one brace group, ending in exit
+# (tools/kf2-idle-reset.sh, "READ WHOLE BEFORE IT RUNS", says why).
+{
 set -uo pipefail
 
 ADDR=${1:-}; PORT=${2:-}
@@ -78,3 +82,4 @@ fi
 echo "listed at $ADDR:"
 printf '%s\n' "$listed" | sed 's/^/  /'
 exit 0
+}

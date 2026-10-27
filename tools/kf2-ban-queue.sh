@@ -46,6 +46,10 @@
 # read a host log to learn whether the thing they asked for happened. And a
 # webhook that fails is said on stderr and fails this run: "delivered" is a
 # claim too, and `curl -s` without checking the status code makes it for you.
+#
+# Read whole before it runs: one brace group, ending in exit
+# (tools/kf2-idle-reset.sh, "READ WHOLE BEFORE IT RUNS", says why).
+{
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -150,3 +154,4 @@ It stays queued and will be tried again in five minutes." || true
   status=1
 fi
 exit "$status"
+}

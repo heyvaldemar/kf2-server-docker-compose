@@ -44,6 +44,10 @@
 # NOT PROVEN EMPTY IS NOT EMPTY. An unanswered query, or a container still in
 # its start period, queues the ban too. Silence is when a restart is least
 # welcome, and a server that is mid-install is not one to restart on a guess.
+#
+# Read whole before it runs: one brace group, ending in exit
+# (tools/kf2-idle-reset.sh, "READ WHOLE BEFORE IT RUNS", says why).
+{
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -334,8 +338,10 @@ if [ "$answered" != 1 ]; then
 fi
 if ini_list --running | grep -qx "$SID"; then
   if [ "$ACTION" = add ]; then dequeue "$SID"; echo "banned $SID"; exit 0; fi
-  echo "STILL BANNED after remove: the server kept $SID" >&2; exit 1
+  echo "STILL BANNED after remove: the server kept $SID" >&2
 else
   if [ "$ACTION" = remove ]; then echo "unbanned $SID"; exit 0; fi
-  echo "NOT BANNED after add: the server dropped $SID when it rewrote its config" >&2; exit 1
+  echo "NOT BANNED after add: the server dropped $SID when it rewrote its config" >&2
 fi
+exit 1
+}

@@ -46,6 +46,10 @@
 #                but empty means "could not be read"
 #   KF2_REFRESH_STEAM_TOLERANCE   seconds of Steam silence before exit 1 (10800)
 #   KF2_REFRESH_STEAM_SILENT_FILE where that silence started (.kf2-refresh-steam-silent)
+#
+# Read whole before it runs: one brace group, ending in exit
+# (tools/kf2-idle-reset.sh, "READ WHOLE BEFORE IT RUNS", says why).
+{
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -154,3 +158,4 @@ if [ "$now" = "$latest" ]; then
 fi
 say "FAILED: still on build ${now:-unknown} fifteen minutes after the restart; players on the new client cannot join until it updates. docker compose -p $PROJECT logs --tail 200 kf2-server" >&2
 exit 1
+}
