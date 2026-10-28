@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Changed
+
+- **The crash record in the README is current.** The game crashed again on 2026-10-28, on a map change, after the cache directory had cut crashes about tenfold. The README now gives the measured pattern (3 crashes in about 300 map changes with players moving, none in about 200 on an empty server, stock maps, no mutators) and how to read a crash log: during a map change the server counts 0 players and closes every connection, so the players a crash dropped are the ones whose connections were cleaned up as the old map shut down. Documentation only.
 
 ## [1.6.1] - 2026-10-27
 
