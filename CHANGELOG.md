@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`gameservermanagers/gameserver:kf2` was rebuilt upstream**; the pin moved from `sha256:9fc0e681902a…` to `sha256:01586342139d…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.
+
 ### Changed
 
 - **The crash record in the README is current.** The game crashed again on 2026-10-28, on a map change, after the cache directory had cut crashes about tenfold. The README now gives the measured pattern (3 crashes in about 300 map changes with players moving, none in about 200 on an empty server, stock maps, no mutators) and how to read a crash log: during a map change the server counts 0 players and closes every connection, so the players a crash dropped are the ones whose connections were cleaned up as the old map shut down. Documentation only.
