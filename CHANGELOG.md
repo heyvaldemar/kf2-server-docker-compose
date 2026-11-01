@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.6.3] - 2026-11-01
+
 ### Fixed
 
 - **The timers keep running the night the clocks go back.** `kf2-ban-queue.timer` (`*:0/5`) and `kf2-idle-reset.timer` (`*:2/5`) were local-time calendars, and on 2026-11-01 the server this template comes from ran none of its local-time timers between 06:00 and 07:00 UTC: systemd took the repeated hour as already gone. They are now in UTC, with an `OnUnitActiveSec` net a little longer than the period and `AccuracySec=1s`. `tests/timers.sh` reproduces that night with `systemd-analyze` and fails on a local-time calendar. Reinstall the units after updating: `sudo cp systemd/*.timer /etc/systemd/system/ && sudo systemctl daemon-reload`.
@@ -240,7 +244,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.2...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.3...HEAD
+[1.6.3]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.5.0...v1.6.0
