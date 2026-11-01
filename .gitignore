@@ -5,3 +5,5 @@
 .kf2-idle-reset.last
 .kf2-idle-reset.uptime
 .kf2-refresh-steam-silent
+__pycache__/
+*.pyc
