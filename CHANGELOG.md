@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Changed
+
+- **The KFGame/Cache note, corrected.** LinuxGSM's maintainer tested the KF2 wiki's note on a fresh install of build 10897 ([GameServerManagers/LinuxGSM#5108](https://github.com/GameServerManagers/LinuxGSM/pull/5108#issuecomment-6545539391)): the server makes the directory itself on its first Workshop download, and the crash he reproduced comes from a Workshop map set as the starting map before it is downloaded. This template starts on a stock map, so the README and the config no longer credit the directory with the quiet days after it was made. The directory is still made; it is harmless.
 
 ## [1.6.2] - 2026-10-31
 
