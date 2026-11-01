@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(no unreleased changes yet)_
 
+## [1.6.4] - 2026-11-01
+
+### Changed
+
+- **`tests/timers.sh` checks the fall-back on Berlin time (2026-10-25).** Any zone with a fall-back shows the same skip; the timers themselves are unchanged.
+
 ## [1.6.3] - 2026-11-01
 
 ### Fixed
@@ -244,7 +250,8 @@ _(no unreleased changes yet)_
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.3...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.4...HEAD
+[1.6.4]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.3...v1.6.4
 [1.6.3]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.0...v1.6.1
