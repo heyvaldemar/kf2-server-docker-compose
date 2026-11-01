@@ -13,11 +13,11 @@ _(no unreleased changes yet)_
 
 ### Fixed
 
-- **The timers keep running the night the clocks go back.** `kf2-ban-queue.timer` (`*:0/5`) and `kf2-idle-reset.timer` (`*:2/5`) were local-time calendars, and on 2026-11-01 the server this template comes from ran none of its local-time timers between 06:00 and 07:00 UTC: systemd took the repeated hour as already gone. They are now in UTC, with an `OnUnitActiveSec` net a little longer than the period and `AccuracySec=1s`. `tests/timers.sh` reproduces that night with `systemd-analyze` and fails on a local-time calendar. Reinstall the units after updating: `sudo cp systemd/*.timer /etc/systemd/system/ && sudo systemctl daemon-reload`.
+- **The timers keep running the night the clocks go back.** `kf2-ban-queue.timer` (`*:0/5`) and `kf2-idle-reset.timer` (`*:2/5`) were local-time calendars, and the night the clocks went back, the server this template comes from ran none of its local-time timers for an hour: systemd took the repeated hour as already gone. They are now in UTC, with an `OnUnitActiveSec` net a little longer than the period and `AccuracySec=1s`. `tests/timers.sh` reproduces a fall-back night with `systemd-analyze` and fails on a local-time calendar. Reinstall the units after updating: `sudo cp systemd/*.timer /etc/systemd/system/ && sudo systemctl daemon-reload`.
 
 ### Changed
 
-- **The KFGame/Cache note, corrected.** LinuxGSM's maintainer tested the KF2 wiki's note on a fresh install of build 10897 ([GameServerManagers/LinuxGSM#5108](https://github.com/GameServerManagers/LinuxGSM/pull/5108#issuecomment-6545539391)): the server makes the directory itself on its first Workshop download, and the crash he reproduced comes from a Workshop map set as the starting map before it is downloaded. This template starts on a stock map, so the README and the config no longer credit the directory with the quiet days after it was made. The directory is still made; it is harmless.
+- **The KFGame/Cache note, corrected.** LinuxGSM's maintainer tested the KF2 wiki's note on a fresh install of build 10897 ([GameServerManagers/LinuxGSM#5108](https://github.com/GameServerManagers/LinuxGSM/pull/5108#issuecomment-6545539391)): the server makes the directory itself on its first Workshop download, and the crash the maintainer reproduced comes from a Workshop map set as the starting map before it is downloaded. This template starts on a stock map, so the README and the config no longer credit the directory with the quiet days after it was made. The directory is still made; it is harmless.
 
 ## [1.6.2] - 2026-10-31
 

@@ -5,8 +5,8 @@ Description=Restart an empty Killing Floor 2 server closed to takeover
 # Every five minutes: the rule waits fifteen minutes of a server seen empty
 # and closed to takeover, so a run every five minutes acts within one period
 # of that.
-# In UTC. On 2026-11-01, when the clocks went back, the server this template
-# comes from ran none of its local-time timers for an hour: systemd took the
+# In UTC. The night the clocks went back, the server this template comes
+# from ran none of its local-time timers for an hour: systemd took the
 # repeated hour as already gone. UTC has no repeated hour.
 OnCalendar=*:2/5 UTC
 # A net under the calendar: six minutes after the last run, so a missed run is
