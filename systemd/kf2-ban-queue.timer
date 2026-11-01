@@ -5,7 +5,16 @@ Description=Apply Killing Floor 2 bans that had to wait for an empty server
 # Every five minutes: a ban is about the next connection, so an hour's wait
 # costs almost nothing, and five minutes is how long a server stays empty
 # before it is worth acting on.
-OnCalendar=*:0/5
+# In UTC. On 2026-11-01, when the clocks went back, the server this template
+# comes from ran none of its local-time timers for an hour: systemd took the
+# repeated hour as already gone. UTC has no repeated hour.
+OnCalendar=*:0/5 UTC
+# A net under the calendar: six minutes after the last run, so a missed run is
+# made up within a minute. A run on time resets it before it fires.
+OnUnitActiveSec=6min
+# To the second, so the net's margin is real: the default accuracy is a
+# minute.
+AccuracySec=1s
 Persistent=no
 
 [Install]
