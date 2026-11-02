@@ -41,7 +41,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.11.0 \
             tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-idle-reset.sh tools/kf2-listed.sh tools/kf2-refresh.sh \
-            tests/e2e-healthcheck.sh tests/e2e-idle-reset.sh tests/e2e-moderation.sh tests/e2e-refresh.sh tests/e2e-start.sh tests/read-whole.sh tests/timers.sh update.sh
+            tests/docker-failure.sh tests/e2e-healthcheck.sh tests/e2e-idle-reset.sh tests/e2e-moderation.sh tests/e2e-refresh.sh tests/e2e-start.sh tests/read-whole.sh tests/timers.sh update.sh
 
       - name: Every script is read whole before it runs
         # Timers start the idle reset and the ban queue every five minutes;
@@ -57,6 +57,12 @@ jobs:
         # asks systemd-analyze for a fall-back night and fails on a local
         # calendar.
         run: ./tests/timers.sh
+
+      - name: Docker's own failure is never read as the server's answer
+        # When an exec fails, Docker can print its error on stdout, or end
+        # with 137 after half the output. A fake docker plays the shapes
+        # measured on Docker 29 against tools/kf2-a2s.sh.
+        run: ./tests/docker-failure.sh
 
       - name: actionlint (GitHub Actions workflow linting)
         run: |

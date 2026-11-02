@@ -27,6 +27,18 @@
 # least welcome, and a caller that read silence as zero would restart it
 # blind.
 #
+# DOCKER'S OWN FAILURE IS NOT AN ANSWER. When the exec itself fails, Docker
+# can print its error where the program's output goes. On Docker 29, a
+# container that stops between `compose ps` and the exec gives "cannot exec
+# in a stopped state" on stdout with exit 128, and an exec cut off by a
+# restart ends with 137 after printing part of what it had. On the server this
+# template comes from, a chat bot took such a line for a line of the game's
+# log. Here `who` used to drop the first line as its header and report
+# "nobody is on", and kf2-ban.sh took any output at all as the server
+# answering. So an exec that did not end with 0 gives nothing, and an answer
+# must have the shape these programs print: a number, five tab-separated
+# fields, or "answered" first (tests/docker-failure.sh).
+#
 # NAMES ONLY. A2S does not carry Steam ids, and without WebAdmin there is no
 # other live roster, so `who` cannot hand you the id a ban needs. That comes
 # from the chat log the server writes (see README: "Where the id comes from").
@@ -46,14 +58,20 @@ PORT=${PORT:-27015}
 
 compose() { docker compose -f "$COMPOSE_FILE" -p "$PROJECT" "$@"; }
 
-# Runs a python program from stdin inside the game container. Fails, quietly,
-# when there is no running container: that is one of the "did not answer"
-# cases and the caller decides what silence means.
-in_server() { compose exec -T kf2-server python3 - "$@" 2>/dev/null; }
+# Runs a python program from stdin inside the game container and prints what
+# it printed, only when the exec ended with 0 (the programs below always do).
+# Fails, quietly, otherwise: no running container, or Docker failing on the
+# way, is one of the "did not answer" cases and the caller decides what
+# silence means.
+in_server() {
+  local out
+  out=$(compose exec -T kf2-server python3 - "$@" 2>/dev/null) || return 1
+  [ -z "$out" ] || printf '%s\n' "$out"
+}
 
 case "${1:-}" in
   players)
-    in_server "$PORT" <<'PY'
+    out=$(in_server "$PORT" <<'PY'
 import socket, sys
 port = int(sys.argv[1])
 q = b"\xff\xff\xff\xffTSource Engine Query\x00"
@@ -71,6 +89,8 @@ try:
 except Exception:
     pass                                     # nothing printed: unanswered
 PY
+    )
+    case "$out" in ''|*[!0-9]*) ;; *) printf '%s\n' "$out" ;; esac
     exit 0 ;;
   info)
     out=$(in_server "$PORT" <<'PY'
@@ -94,7 +114,7 @@ except Exception:
     pass
 PY
     )
-    if [ -z "$out" ]; then
+    if ! printf '%s\n' "$out" | awk -F'\t' 'NF != 5 || $3 !~ /^[0-9]+$/ || $4 !~ /^[0-9]+$/ { bad = 1 } END { exit (NR != 1 || bad) }'; then
       echo "the server is not answering on 127.0.0.1:$PORT inside the container: it may be starting, installing, or down" >&2
       exit 1
     fi
@@ -122,7 +142,7 @@ except Exception:
     pass
 PY
     )
-    if [ -z "$out" ]; then
+    if [ "$(printf '%s\n' "$out" | head -1)" != answered ]; then
       echo "the server is not answering on 127.0.0.1:$PORT inside the container: it may be starting, installing, or down" >&2
       exit 1
     fi

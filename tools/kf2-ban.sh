@@ -336,7 +336,14 @@ if [ "$answered" != 1 ]; then
   echo "the server has not answered within ${WAIT}s after the restart; the edit is in the file but not yet proven. Check later with: tools/kf2-ban.sh list" >&2
   exit 4
 fi
-if ini_list --running | grep -qx "$SID"; then
+# A read that failed proves nothing either way: through a pipe into grep, an
+# exec Docker refused would read as "not in the list", and a remove would
+# report "unbanned" on no evidence (tools/kf2-a2s.sh, "DOCKER'S OWN FAILURE").
+if ! after=$(ini_list --running); then
+  echo "the server answered, but its ban list could not be read back; the edit is in the file but not yet proven. Check later with: tools/kf2-ban.sh list" >&2
+  exit 4
+fi
+if printf '%s\n' "$after" | grep -qx "$SID"; then
   if [ "$ACTION" = add ]; then dequeue "$SID"; echo "banned $SID"; exit 0; fi
   echo "STILL BANNED after remove: the server kept $SID" >&2
 else

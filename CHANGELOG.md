@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Fixed
+
+- **Docker's own failure is no longer read as the server's answer.** When an exec fails, Docker can print its error where the program's output goes: on Docker 29, a container that stops between the check and the exec gives "cannot exec in a stopped state" on stdout with exit 128, and an exec cut off by a restart ends with 137 after part of its output. `tools/kf2-a2s.sh who` dropped that line as its header and reported "nobody is on", `players` printed it as the count, and `tools/kf2-ban.sh` took any output as the server answering after a restart. The probe now takes nothing from an exec that did not end with 0 and checks each answer's shape, and the ban's read-back after a restart no longer reports "unbanned" from a read that failed. On the server this template comes from, a chat bot read the same line as part of a game's log. `tests/docker-failure.sh` plays the measured shapes through a fake `docker`; the released probe fails 9 of its 17 checks.
 
 ## [1.6.4] - 2026-11-01
 
