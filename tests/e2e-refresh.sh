@@ -9,9 +9,13 @@
 #
 # Against the moderation stand-in (tests/fixtures/): the pinned image with
 # fake-kf2.py answering A2S where the game would be, players set per case. The
-# two build numbers come through KF2_BUILDS instead of LinuxGSM asking Steam.
-# Nothing here reaches the real restart: the cases that would go ahead run
-# with --dry-run, and the start counter proves nothing restarted.
+# two build numbers come through KF2_BUILDS instead of LinuxGSM asking Steam,
+# except in cases 11 to 13, where LinuxGSM's own check-update runs in the
+# pinned image with SteamCMD stubbed: until v1.6.5 the Steam-silence cases fed
+# the script a shape LinuxGSM never prints, and the tolerance they passed was
+# never reached in a real run. Nothing here reaches the real restart: the
+# cases that would go ahead run with --dry-run, and the start counter proves
+# nothing restarted.
 #
 # And the reason this script exists, against the pinned image itself: as the
 # game's user, LinuxGSM's update cron cannot be installed under
@@ -99,26 +103,66 @@ if [ "$rc" = 1 ] && grep -q "could not read both builds" <<<"$out"; then pass "a
 
 # 8. Steam silent, the installed build read: tolerated, and the start noted.
 silent="$(mktemp)"; rm -f "$silent"
-out="$(KF2_BUILDS="100 " KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
+out="$(KF2_BUILDS="100 - quiet" KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
 if [ "$rc" = 0 ] && grep -q "Steam did not say which build it ships (running build 100); quiet for 0 min, tolerated up to 180 min" <<<"$out" && [ -s "$silent" ]; then pass "Steam silent: tolerated, exit 0, the start noted"; else fail "Steam silent: exit $rc, said: $out"; fi
 
 # 9. However often it runs, the span is what counts: quiet for four hours fails.
 echo "$(( $(date +%s) - 14400 ))" > "$silent"
-out="$(KF2_BUILDS="100 " KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
+out="$(KF2_BUILDS="100 - quiet" KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
 if [ "$rc" = 1 ] && grep -q "for 240 min, past the 180 min tolerance" <<<"$out"; then pass "Steam silent for four hours: exit 1"; else fail "Steam silent past the span: exit $rc, said: $out"; fi
 
 # 9a. A start in the future would keep the silence young forever: it starts now.
 echo "$(( $(date +%s) + 86400 ))" > "$silent"
-out="$(KF2_BUILDS="100 " KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
+out="$(KF2_BUILDS="100 - quiet" KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
 if [ "$rc" = 0 ] && grep -q "quiet for 0 min" <<<"$out" && [ "$(cat "$silent")" -le "$(date +%s)" ]; then pass "a start in the future: re-anchored to now"; else fail "future start: exit $rc, said: $out"; fi
 
 # 9b. A silence that cannot be recorded is not tolerated.
-out="$(KF2_BUILDS="100 " KF2_REFRESH_STEAM_SILENT_FILE="/nonexistent-dir/silent" refresh 2>&1)"; rc=$?
+out="$(KF2_BUILDS="100 - quiet" KF2_REFRESH_STEAM_SILENT_FILE="/nonexistent-dir/silent" refresh 2>&1)"; rc=$?
 if [ "$rc" = 1 ] && grep -q "cannot record when Steam went quiet" <<<"$out"; then pass "silence that cannot be recorded: exit 1"; else fail "unrecordable silence: exit $rc, said: $out"; fi
 
 # 10. Steam answers again: the span starts over.
 out="$(KF2_BUILDS="100 100" KF2_REFRESH_STEAM_SILENT_FILE="$silent" refresh 2>&1)"; rc=$?
 if [ "$rc" = 0 ] && [ ! -e "$silent" ]; then pass "Steam answers: the silence is forgotten"; else fail "Steam answers: exit $rc, file left: $([ -e "$silent" ] && echo yes), said: $out"; fi
+
+echo
+echo "=== the builds, as LinuxGSM in the pinned image prints them ==="
+echo
+# LinuxGSM's own check-update in the stand-in container: an app manifest with
+# build 100 where LinuxGSM reads it, and SteamCMD stubbed to answer from
+# /data/steam-build, a build number or nothing at all. LinuxGSM fetches its
+# configuration on first use, so this needs the network.
+# shellcheck disable=SC2016  # expanded by the stub, not by this shell
+compose exec -T --user root kf2-server sh -c '
+  chown -R linuxgsm:linuxgsm /app
+  cat > /usr/bin/steamcmd <<"SH"
+#!/bin/sh
+b=$(cat /data/steam-build 2>/dev/null)
+[ -n "$b" ] || exit 0
+printf "\"branches\"\n{\n\"public\"\n{\n\"buildid\" \"%s\"\n}\n}\n" "$b"
+SH
+  chmod 755 /usr/bin/steamcmd' >/dev/null 2>&1
+compose exec -T --user linuxgsm kf2-server sh -c '
+  cd /app && { [ -x kf2server ] || ./linuxgsm.sh kf2server >/dev/null 2>&1; }
+  mkdir -p /data/serverfiles/steamapps
+  printf "\"AppState\"\n{\n\t\"appid\"\t\t\"232130\"\n\t\"buildid\"\t\t\"100\"\n}\n" > /data/serverfiles/steamapps/appmanifest_232130.acf' >/dev/null 2>&1
+
+# 11. Steam ships 101: behind, read from LinuxGSM's own lines.
+fake_set 101 steam-build
+out="$(refresh --check 2>&1)"; rc=$?
+if [ "$rc" = 0 ] && grep -q "behind: running build 100, Steam ships 101" <<<"$out"; then pass "LinuxGSM's own answer, Steam ships 101: behind"; else fail "LinuxGSM, Steam ships 101: exit $rc, said: $out"; fi
+
+# 12. THE CASE v1.6.5 FIXES: Steam answers nothing. LinuxGSM stops at
+# "[ FAIL ] ... Checking remote build" and prints neither build; that is
+# Steam's silence, tolerated, with the installed build from the manifest.
+fake_rm steam-build
+real_silent="$(mktemp)"; rm -f "$real_silent"
+out="$(KF2_REFRESH_STEAM_SILENT_FILE="$real_silent" refresh 2>&1)"; rc=$?
+if [ "$rc" = 0 ] && grep -q "Steam did not say which build it ships (running build 100); quiet for 0 min" <<<"$out" && [ -s "$real_silent" ]; then pass "LinuxGSM, Steam silent: tolerated, exit 0, the start noted"; else fail "LinuxGSM, Steam silent: exit $rc, said: $out"; fi
+
+# 13. Steam ships 100 again: up to date, and the silence is forgotten.
+fake_set 100 steam-build
+out="$(KF2_REFRESH_STEAM_SILENT_FILE="$real_silent" refresh 2>&1)"; rc=$?
+if [ "$rc" = 0 ] && grep -q "up to date: build 100" <<<"$out" && [ ! -e "$real_silent" ]; then pass "LinuxGSM, Steam ships 100: up to date, the silence forgotten"; else fail "LinuxGSM, Steam ships 100: exit $rc, said: $out"; fi
 
 echo
 echo "passed: $PASSED   failed: $FAILED"

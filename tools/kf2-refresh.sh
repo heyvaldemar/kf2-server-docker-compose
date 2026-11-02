@@ -35,15 +35,28 @@
 # on the host was wrong. Its monitoring tolerated "three failures in a row",
 # written for one caller every three hours; a second caller made three strikes
 # land in 67 minutes, and it reported the host down. A count assumes a call
-# rate, and the rate changes with whoever asks. So when the installed build
-# reads and Steam's does not, this notes when Steam went quiet and exits 0
+# rate, and the rate changes with whoever asks. So when LinuxGSM reports that
+# it could not get Steam's build, this notes when Steam went quiet and exits 0
 # until it has been quiet for KF2_REFRESH_STEAM_TOLERANCE seconds (three hours
 # by default), however often it runs in between, and 1 after that. An
 # installed build that cannot be read is a fault here, and exits 1 at once.
 #
+# WHAT LINUXGSM PRINTS WHEN STEAM IS QUIET. Neither build. It prints "Local
+# build" and "Remote build" together, after it has asked Steam, and when Steam
+# gives no build it stops at "[ FAIL ] ... Checking remote build" and exits 1
+# (LinuxGSM v26.4.0 in the pinned image, run with SteamCMD answering nothing).
+# Until v1.6.5 this waited for a local build without a remote one, which
+# LinuxGSM never prints, and the tests handed it exactly that through
+# KF2_BUILDS: so the tolerance above was never reached, and a quiet Steam
+# failed the run at once. Now the failure line is what says Steam is quiet,
+# and the installed build comes from the app manifest, the file LinuxGSM reads
+# it from. tests/e2e-refresh.sh runs the real check-update in the pinned image
+# with SteamCMD stubbed.
+#
 # tests/e2e-refresh.sh proves the decisions against the moderation stand-in.
-#   KF2_BUILDS   "<local> <remote>", in place of asking LinuxGSM (tests); set
-#                but empty means "could not be read"
+#   KF2_BUILDS   "<local> <remote> <steam>", in place of asking LinuxGSM
+#                (tests): "-" for a build not read, <steam> "ok", "quiet" or
+#                "docker:<exit>"; set but empty means "could not be read"
 #   KF2_REFRESH_STEAM_TOLERANCE   seconds of Steam silence before exit 1 (10800)
 #   KF2_REFRESH_STEAM_SILENT_FILE where that silence started (.kf2-refresh-steam-silent)
 #
@@ -74,22 +87,51 @@ limit() { if command -v timeout >/dev/null 2>&1; then timeout "$@"; else shift; 
 
 [ -n "$(compose ps -q --status running kf2-server 2>/dev/null)" ] || { say "the server is not running; nothing to refresh"; exit 0; }
 
+# The installed build from the app manifest, as a number from an exec that
+# ended with 0, or nothing (tools/kf2-a2s.sh, "DOCKER'S OWN FAILURE").
+manifest_build() {
+  local out
+  out=$(compose exec -T kf2-server sh -c "grep -oE '\"buildid\"[[:space:]]+\"[0-9]+\"' /data/serverfiles/steamapps/appmanifest_232130.acf 2>/dev/null | grep -oE '[0-9]+' | head -1" 2>/dev/null) || return 0
+  case "$out" in ''|*[!0-9]*) ;; *) echo "$out" ;; esac
+}
+# Prints "<installed> <latest> <steam>", "-" for a build not read: <steam> is
+# "quiet" when LinuxGSM says it could not get Steam's build, "docker:<exit>"
+# when the exec itself ended with 125 or more (Docker failing, or the exec
+# killed by a restart), and "ok" otherwise. The exec's exit code travels
+# through the pipe as a last line of its own; LinuxGSM's final FAIL line has no
+# newline, hence the bare echo before it.
 builds() {
   if [ -n "${KF2_BUILDS+x}" ]; then echo "$KF2_BUILDS"; return; fi
-  local out
-  out="$(limit 300 docker compose -f "$COMPOSE_FILE" -p "$PROJECT" exec -T --user linuxgsm kf2-server ./kf2server check-update 2>&1 | sed 's/\x1b\[[0-9;]*m//g')"
-  echo "$(grep -oE 'Local build: *[0-9]+' <<<"$out" | grep -oE '[0-9]+$' | tail -1) $(grep -oE 'Remote build: *[0-9]+' <<<"$out" | grep -oE '[0-9]+$' | tail -1)"
+  local out rc installed latest steam=ok
+  out="$( { limit 300 docker compose -f "$COMPOSE_FILE" -p "$PROJECT" exec -T --user linuxgsm kf2-server ./kf2server check-update 2>&1; r=$?; echo; echo "rc=$r"; } | sed 's/\x1b\[[0-9;]*[mK]//g' | tr '\r' '\n')"
+  rc=$(sed -n 's/^rc=//p' <<<"$out" | tail -1)
+  case "$rc" in ''|*[!0-9]*) rc=125 ;; esac
+  if [ "$rc" -ge 125 ]; then echo "- - docker:$rc"; return; fi
+  installed=$(grep -oE 'Local build: *[0-9]+' <<<"$out" | grep -oE '[0-9]+$' | tail -1)
+  latest=$(grep -oE 'Remote build: *[0-9]+' <<<"$out" | grep -oE '[0-9]+$' | tail -1)
+  if [ -z "$latest" ] && grep -qE '\[ FAIL \].*Checking remote build' <<<"$out"; then
+    steam=quiet
+    [ -n "$installed" ] || installed=$(manifest_build)
+  fi
+  echo "${installed:--} ${latest:--} $steam"
 }
 
-installed=""; latest=""
+installed=""; latest=""; steam=""
 for attempt in 1 2; do
-  read -r installed latest <<<"$(builds)"
+  read -r installed latest steam <<<"$(builds)"
+  [ "$installed" = - ] && installed=""
+  [ "$latest" = - ] && latest=""
   [ -n "$installed" ] && [ -n "$latest" ] && break
   [ "$attempt" = 1 ] && [ -z "${KF2_BUILDS+x}" ] && sleep 20
 done
+case "$steam" in
+  docker:*)
+    say "could not ask LinuxGSM: docker exec ended with ${steam#docker:}, so Docker failed or the exec was cut off; that is not Steam going quiet. Nothing changed" >&2
+    exit 1 ;;
+esac
 SILENT_FILE=${KF2_REFRESH_STEAM_SILENT_FILE:-.kf2-refresh-steam-silent}
 TOLERANCE=${KF2_REFRESH_STEAM_TOLERANCE:-10800}
-if [ -n "$installed" ] && [ -z "$latest" ]; then
+if [ "$steam" = quiet ] && [ -n "$installed" ]; then
   now_s=$(date +%s)
   if [ -L "$SILENT_FILE" ]; then
     say "$SILENT_FILE is a symlink; not following it, and not tolerating Steam's silence" >&2
