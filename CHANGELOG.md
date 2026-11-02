@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.6.6] - 2026-11-02
+
 ### Fixed
 
 - **Steam's silence is tolerated, as v1.6.0 said it would be.** `tools/kf2-refresh.sh` took Steam to be quiet when LinuxGSM's `check-update` printed a local build without a remote one. LinuxGSM never prints that: it prints "Local build" and "Remote build" together, after it has asked Steam, and when Steam gives no build it stops at `[ FAIL ] ... Checking remote build` and exits 1, printing neither (LinuxGSM v26.4.0 in the pinned image, run with SteamCMD answering nothing). The tests handed the script the one-build shape through `KF2_BUILDS`, so they passed while a quiet Steam failed every real run at once with "could not read both builds". The failure line is now what says Steam is quiet, the installed build comes from the app manifest, and an exec that ends with 125 or more (Docker failing, or the exec killed) is said to be that, not counted as either. `tests/e2e-refresh.sh` cases 11 to 13 run LinuxGSM's own `check-update` in the pinned image with SteamCMD stubbed; the released script fails case 12.
@@ -258,7 +262,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.5...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.6...HEAD
+[1.6.6]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.5...v1.6.6
 [1.6.5]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.4...v1.6.5
 [1.6.4]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.3...v1.6.4
 [1.6.3]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.2...v1.6.3
