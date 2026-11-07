@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Security
+
+- **`gameservermanagers/gameserver:kf2` was rebuilt upstream**; the pin moved from `sha256:016e05bcbb3a…` to `sha256:48929a3d7e6b…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.
 
 ## [1.6.7] - 2026-11-06
 
