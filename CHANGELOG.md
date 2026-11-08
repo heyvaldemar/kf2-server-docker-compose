@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.7.0] - 2026-11-08
+
 ### Changed
 
 - **The health check asks the server, not its process.** It was pgrep for `KFGameSteamServer.bin`, which a hung or stopped server keeps. `tools/healthcheck.sh`, mounted read-only, now sends A2S_INFO to the query port and is healthy only on the server's reply (challenge handled, two tries, within 7 seconds; the timeout is 10 seconds instead of 5 to hold it). A dead server has no socket and fails at once, so the floor on noticing it stays thirty seconds. It asks from inside the container, so it does not prove the ports are published on the host or open in a firewall; the README says so.
 - **A new workflow, Real Server, boots the game and proves the check against it.** Red while SteamCMD downloads 25 GB with nothing bound, green on the server's A2S answer, red with the server stopped by SIGSTOP while the old pgrep check stays green, green again after SIGCONT. It runs on a push or pull request that touches the check, its test, the compose file, `.env.example`, the instance config or the workflow, every Monday, and by hand. Every push runs the check in the pinned image against a stand-in.
 - **The README names Docker Engine 29.4.2.** That release alone stops SteamCMD, which this image runs to install and update the game (measured on this template's pinned image in tf2-server-docker-compose run 42496129688): upgrade to 29.4.3 or later, which reverted the rule, or point the daemon's `seccomp-profile` at the profile 29.4.3 ships. Ubuntu 26.04's own `docker.io` (27.5.1) never had it; on GitHub Actions the ubuntu-26.04 runner image ships it ([actions/runner-images#14790](https://github.com/actions/runner-images/issues/14790), moving to 29.7.2 in [#15205](https://github.com/actions/runner-images/pull/15205)). Documentation only.
-
 ## [1.6.8] - 2026-11-07
 
 ### Security
@@ -278,7 +281,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.8...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.8...v1.7.0
 [1.6.8]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.7...v1.6.8
 [1.6.7]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.6...v1.6.7
 [1.6.6]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.5...v1.6.6
