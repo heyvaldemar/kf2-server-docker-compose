@@ -40,7 +40,7 @@ jobs:
         # packaged shellcheck is a different version with different defaults.
         run: |
           docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.11.0 \
-            tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-idle-reset.sh tools/kf2-listed.sh tools/kf2-refresh.sh \
+            tools/healthcheck.sh tools/kf2-a2s.sh tools/kf2-ban.sh tools/kf2-ban-queue.sh tools/kf2-idle-reset.sh tools/kf2-listed.sh tools/kf2-refresh.sh \
             tests/docker-failure.sh tests/e2e-healthcheck.sh tests/e2e-idle-reset.sh tests/e2e-moderation.sh tests/e2e-refresh.sh tests/e2e-start.sh tests/read-whole.sh tests/timers.sh update.sh
 
       - name: Every script is read whole before it runs
@@ -130,14 +130,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Prove the exact match catches what a substring match misses
-        # Assertions against a real container, with no game download: two
-        # processes named cs2 and cs2.sh are the whole fixture. The game is
-        # killed and the exact check must go red while the substring check
-        # stays green - if the substring form ever failed too, the comment in
-        # the compose file would be wrong and the run says so. Then the shipped
-        # interval and retries are measured: a dead game must read unhealthy
-        # within the floor they set, and the floor must be a minute or less.
+      - name: The health check goes by the game's answer, in the pinned image
+        # tools/healthcheck.sh is healthy only on the server's reply to
+        # A2S_INFO. Run in the pinned image, so its tools are proven there,
+        # against a stand-in that answers, answers after a challenge, stays
+        # silent, or is not there at all (tests/fixtures/fake-a2s.py); then the
+        # shipped interval and retries must put a dead server's floor at a
+        # minute or less. The real server is .github/workflows/real-server.yml.
         run: |
           chmod +x tests/e2e-healthcheck.sh
           ./tests/e2e-healthcheck.sh

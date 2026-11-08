@@ -104,37 +104,33 @@ services:
       # The image carries none of it, so this volume IS the server — about
       # 25 GB that SteamCMD fetches on first start.
       - kf2-server-data:/data
+      # The health check: A2S_INFO to the query port (see healthcheck: below).
+      - ./tools/healthcheck.sh:/healthcheck.sh:ro
       # THE SETTINGS LIVE OUTSIDE THE VOLUME, where git records their history
       # and a backup that skips 25 GB of replaceable game files still sees them.
       # LinuxGSM reads this file at start; the file it ships beside it,
       # _default.cfg, is overwritten on every update and says so at the top.
       - ./config/kf2server.cfg:/data/config-lgsm/kf2server/kf2server.cfg
     healthcheck:
-      # THE GAME, NOT THE WRAPPER. A first version of this also accepted
-      # `pgrep -f kf2server`, which matches LinuxGSM's own supervising script —
-      # so the container reported HEALTHY while SteamCMD was still downloading
-      # twenty-five gigabytes and no server existed at all. A check that passes
-      # before the thing it checks exists is worse than none, because it is
-      # believed. KFGameSteamServer.bin is the actual server binary.
-      #
-      # THE BRACKET IS LOAD-BEARING. Without it this check passed for every
-      # pattern ever given to it — including one naming a process that does not
-      # exist — because `pgrep -f` searches full command lines and the shell
-      # running the check has the pattern in its own. Measured in this
-      # container: `pgrep -f "ZZZ_no_such_process"` exits 0; with the first
-      # letter in a character class it exits 1. A server crashed with a core
-      # dump, two people were dropped mid-game, and this reported HEALTHY for
-      # the whole of it. tests/e2e-healthcheck.sh proves the bracket against a
-      # real container.
-      test: ["CMD-SHELL", "pgrep -f '[K]FGameSteamServer.bin' >/dev/null"]
+      # THE GAME'S OWN ANSWER, NOT ITS PROCESS. tools/healthcheck.sh sends
+      # A2S_INFO, the Steam query every server browser sends, to the query port
+      # and is healthy only on the server's reply. Up to v1.6.8 this was pgrep
+      # for KFGameSteamServer.bin (bracketed, because pgrep -f matched the
+      # check's own shell), and a hung or stopped server keeps its process; the
+      # real-server workflow stops it with SIGSTOP and requires red. While
+      # SteamCMD downloads 25 GB nothing is bound to the query port, so the
+      # check is red then. Each check ends within 7 seconds. It asks from
+      # inside the container: it does not prove the ports are published on the
+      # host or open in a firewall.
+      test: ["CMD", "bash", "/healthcheck.sh", "${KF2_SERVER_QUERY_PORT:-27015}"]
       # THE INTERVAL TIMES THE RETRIES IS THE FLOOR ON NOTICING A CRASH. At 60s
       # and three retries a dead server read healthy for three minutes, and a
       # watchdog polling every two minutes on top of that left a full server
-      # unable to rejoin for four and a half. A missing process is not a signal
-      # that needs debouncing, and pgrep reading /proc costs nothing, so the
-      # floor is now thirty seconds; tests/e2e-healthcheck.sh measures it.
+      # unable to rejoin for four and a half. A dead server has no socket and
+      # fails at once, so the floor is thirty seconds; tests/e2e-healthcheck.sh
+      # checks it. The timeout is 10 seconds because one check can take 7.
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 3
       # A FULL INSTALL, NOT A RESTART. An empty volume means SteamCMD fetches
       # the whole game; the first install took about ten minutes on a fast link
