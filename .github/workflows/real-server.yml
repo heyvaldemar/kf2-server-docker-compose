@@ -20,6 +20,7 @@ on:
       - tools/healthcheck.sh
       - tests/e2e-healthcheck.sh
       - tests/fixtures/fake-a2s.py
+      - tests/fixtures/port-owner.sh
       - kf2-server-docker-compose.yml
       - .env.example
       - config/**
@@ -31,6 +32,7 @@ on:
       - tools/healthcheck.sh
       - tests/e2e-healthcheck.sh
       - tests/fixtures/fake-a2s.py
+      - tests/fixtures/port-owner.sh
       - kf2-server-docker-compose.yml
       - .env.example
       - config/**
@@ -122,25 +124,29 @@ jobs:
           docker exec "$cid" cat /proc/net/udp
           exit 1
 
-      - name: Plant - a stopped server keeps its process, and the check goes red
-        # The check up to v1.6.8 was pgrep for KFGameSteamServer.bin. SIGSTOP
-        # leaves the process there and the server deaf: that check must still
-        # pass and this one fail; after SIGCONT this one passes again.
+      - name: Plant - the process that answers, stopped, keeps the old check green and turns this one red
+        # The check up to v1.6.8 was pgrep for KFGameSteamServer.bin. SIGSTOP on the process that
+        # owns the port's UDP socket (tests/fixtures/port-owner.sh; a name match
+        # is not enough, LinuxGSM's tmux carries the game's name and stopping it
+        # stops nothing that answers) leaves every process there and nothing
+        # answering: the old check must still pass and this one fail; after
+        # SIGCONT this one passes again.
         run: |
           cid="$($COMPOSE ps -q kf2-server)"
-          pid="$(docker exec "$cid" pgrep -f '[K]FGameSteamServer.bin' | head -1)"
-          [ -n "$pid" ] || { echo "::error::no KFGameSteamServer.bin process to stop"; exit 1; }
+          own="$(docker exec -i "$cid" sh -s 27015 < tests/fixtures/port-owner.sh)" || { echo "::error::nobody this check can see owns UDP 27015"; exit 1; }
+          pid="${own%% *}"
           docker exec "$cid" sh -c "kill -STOP $pid"
+          st="$(docker exec "$cid" sh -c "cut -d' ' -f3 /proc/$pid/stat")"
           o=0; docker exec "$cid" sh -c "pgrep -f '[K]FGameSteamServer.bin' >/dev/null" || o=$?
-          n=0; docker exec "$cid" bash /healthcheck.sh 27015 || n=$?
+          n=0; out="$(docker exec "$cid" bash /healthcheck.sh 27015 2>&1)" || n=$?
           docker exec "$cid" sh -c "kill -CONT $pid"
-          echo "server stopped: the old check exits $o, the new one $n"
+          echo "UDP 27015 belongs to pid $pid (${own#* }), state $st after SIGSTOP: the old check exits $o, the new one $n: $out"
           [ "$o" = 0 ] && [ "$n" = 1 ] || { echo "::error::expected the old check to pass (0) and the new one to fail (1)"; exit 1; }
           for _ in $(seq 1 30); do
             docker exec "$cid" bash /healthcheck.sh 27015 && exit 0
             sleep 2
           done
-          echo "::error::the server did not answer again after SIGCONT"; exit 1
+          echo "::error::the game did not answer again after SIGCONT"; exit 1
 
       - name: Stop
         if: always()
