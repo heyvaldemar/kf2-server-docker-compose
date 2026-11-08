@@ -133,14 +133,21 @@ jobs:
         # SIGCONT this one passes again.
         run: |
           cid="$($COMPOSE ps -q kf2-server)"
-          own="$(docker exec -i "$cid" sh -s 27015 < tests/fixtures/port-owner.sh)" || { echo "::error::nobody this check can see owns UDP 27015"; exit 1; }
-          pid="${own%% *}"
-          docker exec "$cid" sh -c "kill -STOP $pid"
-          st="$(docker exec "$cid" sh -c "cut -d' ' -f3 /proc/$pid/stat")"
+          # The owners are visible only to their own user; try every uid here.
+          uids="$(docker exec "$cid" sh -c 'cat /proc/[0-9]*/status 2>/dev/null' | awk '/^Uid:/ { print $2 }' | sort -u)"
+          own=""; as=""
+          for u in $uids; do
+            own="$(docker exec -u "$u" -i "$cid" sh -s 27015 < tests/fixtures/port-owner.sh 2>/dev/null)" && { as="$u"; break; }
+          done
+          [ -n "$own" ] || { echo "::error::no user in the container can see who owns UDP 27015"; docker exec "$cid" cat /proc/net/udp; exit 1; }
+          echo "UDP 27015 is owned by (pid uid comm), as seen by uid $as:"; echo "$own"
+          pids="$(awk '{ print $1 }' <<<"$own" | tr '\n' ' ')"
+          docker exec -u "$as" "$cid" sh -c "kill -STOP $pids"
+          st="$(docker exec "$cid" sh -c "for p in $pids; do cut -d' ' -f3 /proc/\$p/stat; done" | tr '\n' ' ')"
           o=0; docker exec "$cid" sh -c "pgrep -f '[K]FGameSteamServer.bin' >/dev/null" || o=$?
           n=0; out="$(docker exec "$cid" bash /healthcheck.sh 27015 2>&1)" || n=$?
-          docker exec "$cid" sh -c "kill -CONT $pid"
-          echo "UDP 27015 belongs to pid $pid (${own#* }), state $st after SIGSTOP: the old check exits $o, the new one $n: $out"
+          docker exec -u "$as" "$cid" sh -c "kill -CONT $pids"
+          echo "owners stopped (states: $st): the old check exits $o, the new one $n: $out"
           [ "$o" = 0 ] && [ "$n" = 1 ] || { echo "::error::expected the old check to pass (0) and the new one to fail (1)"; exit 1; }
           for _ in $(seq 1 30); do
             docker exec "$cid" bash /healthcheck.sh 27015 && exit 0
