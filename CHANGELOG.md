@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.8.1] - 2026-11-14
+
 ### Fixed
 
 - **A kill for memory is named even when Docker stores its oom event late.** On a GitHub runner (Docker 29.4.2) the oom event of 1 kill in 20 was not there when the die event was, and was ten seconds later ([run 43623563645 in l4d2-server-docker-compose](https://github.com/heyvaldemar/l4d2-server-docker-compose/actions/runs/43623563645)), so the idle reset's restart watch called a kill for memory a plain SIGKILL. A 137 with no oom event yet is now read again, for up to ten seconds (the same watch: 20 of 20 named, [run 43624152790](https://github.com/heyvaldemar/l4d2-server-docker-compose/actions/runs/43624152790)).
@@ -313,7 +317,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.1...HEAD
+[1.8.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.8...v1.7.0
