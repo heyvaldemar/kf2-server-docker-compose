@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.8.0] - 2026-11-14
+
 ### Security
 
 - **The passwords in the server's ini are no longer in `docker compose logs`.** LinuxGSM's `details`, which the image runs after every start, prints the passwords it finds in `LinuxServer-KFGame.ini` in clear: `GamePassword` as "Server password", `AdminPassword` as "Admin password" and "Web Interface password". This template leaves both empty, but a server with a join password had it in its logs on every start (CI, with both set in the ini on v1.7.1: both in `docker compose logs`, [run 43617936849](https://github.com/heyvaldemar/kf2-server-docker-compose/actions/runs/43617936849)). `tools/start.sh` is now the entrypoint: it runs the image's own entrypoint behind a filter that masks the value on any line whose label says "pass", in any case, and of any `…Password=` setting, and stays process 1 so that Docker's stop still reaches LinuxGSM's `stop`. **If you set a password in the ini and posted this server's logs anywhere, change it**: docker keeps earlier starts' output in its log files until they rotate out.
 - **The moderation webhook's address is no longer on a command line.** `tools/kf2-ban-queue.sh` gave it to curl as an argument, where every process on the host could read it in `ps` for as long as curl ran, and the address of an incoming webhook is its key. curl now reads it from stdin (`--config -`). `tests/e2e-moderation.sh` posts to a listener on the runner and checks the address was not among curl's arguments.
 - **CI looks for both passwords everywhere they could leak to.** `tests/secret-probe.sh` with `tests/fixtures/operator-password.sh`, which sets a value of its own for each in the ini the way an operator does: it fails on either in `docker compose logs`, LinuxGSM's logs and the game's `Launch.log`, any command line in the container or the host's `ps`, after the start and after a restart, and names the place, never the value. Red on v1.7.1, green with this release ([run 43617934701](https://github.com/heyvaldemar/kf2-server-docker-compose/actions/runs/43617934701)).
-
 - **`gameservermanagers/gameserver:kf2` was rebuilt upstream**; the pin moved from `sha256:0fb3a9819446…` to `sha256:6e35af1b5ca2…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.
 
 ### Fixed
@@ -20,12 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A crashed game comes back.** In this image process 1 is the entrypoint, which keeps running when the game dies: the container stays up, Docker restarts nothing, and the health check goes red and stays red, with nobody able to join, until someone restarts it by hand (CI on v1.7.1: SIGSEGV to the game, four minutes later the container still running, unhealthy, restart count 0, [run 43617936849](https://github.com/heyvaldemar/kf2-server-docker-compose/actions/runs/43617936849)). `tools/kf2-idle-reset.sh`, on its five-minute timer, now sees LinuxGSM's started lock with no game process (and no update, start or stop under way), restarts the server and says so; a second time within the hour it says so, exits 1 and leaves it. It also reports Docker's own restarts of the container once each, with the exit code and the reason from Docker's die and oom events, and exits 1 at three in a day. On the real server: SIGSEGV to the game, the next timer run restarted it, it answered A2S again, and the run after said nothing ([run 43617934701](https://github.com/heyvaldemar/kf2-server-docker-compose/actions/runs/43617934701)). `tests/e2e-idle-reset.sh` and `tests/restarts.sh` cover the decisions and Docker's restarts.
 - **The health check could cut its own request in two.** bash writes printf's output line by line, so the query echoing the server's challenge went out as two datagrams whenever the challenge held a newline byte (0x0a), and that try went unanswered; one check in a few thousand, which the retries covered. The request now goes to a file first and out in one write. `tests/e2e-healthcheck.sh` proves it against a stand-in whose challenge holds one: the old check sends 26 and 3 bytes and stays unhealthy, this one one datagram of 29.
 - **The real-server test no longer ignores the check it runs after the first green.** It ran the health check once more and exited 0 whatever that said; once, the second after Docker first called the server healthy, nothing was bound to the query port ([run 43616055520](https://github.com/heyvaldemar/kf2-server-docker-compose/actions/runs/43616055520)). The server must now answer within three minutes of that first green, and what it does meanwhile is printed.
+- **An index pushed again over the same build is no longer reported as drift.** The daily pin check compared each pin with the digest the tag's index has now and failed on any difference, so a publisher re-pushing the index over the very same images (a platform added, an attestation rewritten) turned it red for an image nobody rebuilt, and no pin would ever move to turn it green. It now also compares the linux/amd64 build under both digests, the one CI runs and proves: the same build passes with a notice naming both digests, a new build fails as drift exactly as before, and a build that cannot be read still fails.
 
 ### Changed
 
 - **A stop is measured.** `tests/clean-stop.sh` times `docker compose stop` on the real server: 6 seconds of the 60-second grace period, exit 0, no SIGKILL; LinuxGSM's `stop` runs as before (7 seconds on v1.7.1). Killing Floor 2 keeps no world to save.
-
-- **An index pushed again over the same build is no longer reported as drift.** The daily pin check compared each pin with the digest the tag's index has now and failed on any difference, so a publisher re-pushing the index over the very same images (a platform added, an attestation rewritten) turned it red for an image nobody rebuilt, and no pin would ever move to turn it green. It now also compares the linux/amd64 build under both digests, the one CI runs and proves: the same build passes with a notice naming both digests, a new build fails as drift exactly as before, and a build that cannot be read still fails.
 
 ## [1.7.1] - 2026-11-09
 
@@ -305,7 +307,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.8...v1.7.0
 [1.6.8]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.6.7...v1.6.8
