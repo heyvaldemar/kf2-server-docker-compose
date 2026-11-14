@@ -4,6 +4,9 @@
 .kf2-idle-reset
 .kf2-idle-reset.last
 .kf2-idle-reset.uptime
+.kf2-idle-reset.crash
+.kf2-idle-reset.restarts
+.kf2-idle-reset.crashes
 .kf2-refresh-steam-silent
 __pycache__/
 *.pyc

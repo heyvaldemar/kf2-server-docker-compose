@@ -193,6 +193,46 @@ fi
 out=$(tools/kf2-ban-queue.sh 2>&1); rc=$?
 [ "$rc" = 0 ] && [ -z "$out" ] && pass "nothing queued: silent, exit 0, the normal case every five minutes" || fail "empty queue run exited $rc: $out"
 
+echo; echo "--- a webhook that answers: delivered, and its address on no command line"
+# The address of an incoming webhook is its key: whoever has it can post to
+# the channel. curl gets it on stdin (--config -), not as an argument, where
+# every process on the host could read it in ps. A curl in front of the real
+# one writes down the arguments it was given; a listener on this host takes
+# the post and writes down the path it was sent to.
+KEY="k$(openssl rand -hex 12)"
+mkdir -p "$SCRATCH/bin"
+printf '#!/bin/sh
+printf "%%s\n" "$@" >>"%s/curl.argv"
+exec "%s" "$@"
+' "$SCRATCH" "$(command -v curl)" >"$SCRATCH/bin/curl"
+chmod +x "$SCRATCH/bin/curl"
+python3 -c '
+import http.server, sys
+class H(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        open(sys.argv[1], "a").write(self.path + "\n")
+        self.send_response(204); self.end_headers()
+    def log_message(self, *a): pass
+s = http.server.HTTPServer(("127.0.0.1", 0), H)
+open(sys.argv[2], "w").write(str(s.server_port))
+s.serve_forever()' "$SCRATCH/hook.paths" "$SCRATCH/hook.port" &
+hookpid=$!
+for _ in $(seq 1 40); do [ -s "$SCRATCH/hook.port" ] && break; sleep 0.25; done
+fake_set 1 players
+tools/kf2-ban.sh add 76561198000000003 >/dev/null 2>&1
+fake_set 0 players
+out=$(PATH="$SCRATCH/bin:$PATH" KF2_MODERATION_WEBHOOK="http://127.0.0.1:$(cat "$SCRATCH/hook.port")/hooks/$KEY" tools/kf2-ban-queue.sh 2>"$SCRATCH/err"); rc=$?
+kill "$hookpid" 2>/dev/null
+wait_ready
+if [ "$rc" = 0 ] && grep -qx "/hooks/$KEY" "$SCRATCH/hook.paths" 2>/dev/null && [ -s "$SCRATCH/curl.argv" ] && ! grep -q "$KEY" "$SCRATCH/curl.argv"; then
+  pass "the applied ban was posted to the webhook, and its address was not among curl's arguments"
+else
+  fail "webhook delivery: exit $rc, posts to: $(tr '\n' ' ' <"$SCRATCH/hook.paths" 2>/dev/null), the address among curl's arguments: $(grep -c "$KEY" "$SCRATCH/curl.argv" 2>/dev/null), stderr: $(cat "$SCRATCH/err")"
+fi
+tools/kf2-ban.sh remove 76561198000000003 >/dev/null 2>&1
+wait_ready
+
 echo; echo "--- the read-back notices what the server did not keep"
 fake_set 76561198000000001 drop-on-start
 out=$(tools/kf2-ban.sh add 76561198000000001 2>&1); rc=$?

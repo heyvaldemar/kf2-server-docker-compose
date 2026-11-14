@@ -109,5 +109,36 @@ out="$(KF2_TAKEOVER="" reset 2>&1)"; rc=$?
 if [ "$rc" = 0 ] && grep -q "no takeover advertisement in the log yet: nothing to do" <<<"$out" && [ "$(starts)" = "$before" ]; then pass "no advertisement in the log yet: nothing to do"; else fail "not in the log: exit $rc, said: $out"; fi
 
 echo
+echo "=== the game gone from its running container ==="
+echo
+
+# LinuxGSM writes its started lock at start and removes it at stop. The
+# stand-in runs no game process, so a started lock in it reads as a game that
+# was started, never stopped, and is gone: a crash.
+# shellcheck disable=SC2016   # expanded by the container's sh, on purpose
+lock() { compose exec -T -u 0 kf2-server sh -c 'mkdir -p /app/lgsm/lock && for f in "$@"; do date +%s >"/app/lgsm/lock/$f.lock"; done' -- "$@" >/dev/null 2>&1; }
+unlock() { compose exec -T -u 0 kf2-server sh -c 'rm -f /app/lgsm/lock/*.lock' >/dev/null 2>&1; }
+
+# 10. Started, and an update under way (it stops the game while SteamCMD
+#     runs): not a crash. The rule goes on as before.
+lock kf2server-started updating
+out="$(KF2_TAKEOVER=True reset 2>&1)"; rc=$?
+if [ "$rc" = 0 ] && grep -q "open to takeover: nothing to do" <<<"$out" && [ "$(starts)" = "$before" ]; then pass "started, no game, an update under way: not a crash, not restarted"; else fail "update under way: exit $rc, starts $(starts) from $before, said: $out"; fi
+unlock
+
+# 11. Started, nothing under way, no game: restarted, said, stamp written.
+lock kf2server-started
+out="$(KF2_TAKEOVER=True reset 2>&1)"; rc=$?
+answers 0
+if [ "$rc" = 0 ] && grep -q "restarted: the game was gone from its running container" <<<"$out" && [ "$(starts)" = $((before + 1)) ] && [ -s "$KF2_IDLE_RESET_STATE.crash" ]; then pass "the game gone: restarted once, said, the stamp written"; else fail "the game gone: exit $rc, starts $(starts) from $before, said: $out"; fi
+before="$(starts)"
+
+# 12. Gone again within the hour (the lock outlives a restart, in the
+#     container's own layer): said, exit 1, not restarted.
+out="$(KF2_TAKEOVER=True reset 2>&1)"; rc=$?
+if [ "$rc" = 1 ] && grep -q "gone from its running container again, within an hour" <<<"$out" && [ "$(starts)" = "$before" ]; then pass "gone again within the hour: exit 1, not restarted"; else fail "crash loop guard: exit $rc, starts $(starts) from $before, said: $out"; fi
+unlock; rm -f "$KF2_IDLE_RESET_STATE.crash"
+
+echo
 echo "passed: $PASSED   failed: $FAILED"
 [ "$FAILED" -eq 0 ]

@@ -81,7 +81,13 @@ notify() {   # title body -> 0 delivered, 1 not delivered (and says so)
   [ -n "$HOOK" ] || return 0
   local payload code
   payload=$(printf '{"text": "**%s**\\n%s"}' "$(json_escape "$1")" "$(json_escape "$2")")
-  code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "$payload" "$HOOK" 2>/dev/null)
+  # The webhook's address is its key, so curl reads it from stdin (--config -)
+  # and it is on no command line: an argument is visible to every process on
+  # the host, in ps, for as long as curl runs. A quote or a backslash in it is
+  # escaped for curl's config syntax.
+  local url=${HOOK//\\/\\\\}
+  url=${url//\"/\\\"}
+  code=$(printf 'url = "%s"\n' "$url" | curl -sS --max-time 25 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "$payload" --config - 2>/dev/null)
   case "$code" in 200|201|204) return 0 ;; esac
   echo "notify FAILED: HTTP ${code:-000} from the moderation webhook; the news above was not delivered" >&2
   return 1

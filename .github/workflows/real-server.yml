@@ -21,6 +21,11 @@ on:
       - tests/e2e-healthcheck.sh
       - tests/fixtures/fake-a2s.py
       - tests/fixtures/port-owner.sh
+      - tests/fixtures/operator-password.sh
+      - tests/secret-probe.sh
+      - tools/start.sh
+      - tools/kf2-idle-reset.sh
+      - tests/clean-stop.sh
       - kf2-server-docker-compose.yml
       - .env.example
       - config/**
@@ -33,6 +38,11 @@ on:
       - tests/e2e-healthcheck.sh
       - tests/fixtures/fake-a2s.py
       - tests/fixtures/port-owner.sh
+      - tests/fixtures/operator-password.sh
+      - tests/secret-probe.sh
+      - tools/start.sh
+      - tools/kf2-idle-reset.sh
+      - tests/clean-stop.sh
       - kf2-server-docker-compose.yml
       - .env.example
       - config/**
@@ -59,6 +69,14 @@ jobs:
     timeout-minutes: 90
     env:
       COMPOSE: docker compose -f kf2-server-docker-compose.yml -p kf2
+      # tests/secret-probe.sh. The compose file passes no secret: Killing
+      # Floor 2 reads its passwords from the server's ini, where
+      # tests/fixtures/operator-password.sh sets two, the way an operator
+      # does, and adds them to the probe's values.
+      PROBE_PROJECT: kf2
+      # The logs on disk an operator pastes: LinuxGSM's copy of the console,
+      # its own script log, and the game's.
+      PROBE_GAME_LOGS: kf2-server:/data/log/console/*.log kf2-server:/data/log/script/*.log kf2-server:/data/serverfiles/KFGame/Logs/Launch.log
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -92,6 +110,7 @@ jobs:
       - name: First start - the game is downloaded into the volume
         run: |
           cp .env.example .env
+          tests/secret-probe.sh plant
           docker volume create kf2-server-data >/dev/null
           $COMPOSE up -d
 
@@ -112,7 +131,27 @@ jobs:
           cid="$($COMPOSE ps -q kf2-server)"
           for _ in $(seq 1 300); do
             s="$(docker inspect "$cid" --format '{{.State.Health.Status}}' 2>/dev/null || echo none)"
-            [ "$s" = healthy ] && { echo "health: $s"; docker exec "$cid" bash /healthcheck.sh 27015; exit 0; }
+            if [ "$s" = healthy ]; then
+              echo "health: $s"
+              # THE FIRST GREEN CAN BE FOLLOWED BY A GAP. In run 43616055520
+              # nothing was bound to the query port the second after Docker
+              # first said healthy. The server must answer again within three
+              # minutes; what it did meanwhile is printed.
+              for i in $(seq 1 36); do
+                if docker exec "$cid" bash /healthcheck.sh 27015; then [ "$i" = 1 ] || echo "answering again $((i * 5 - 5))s after"; break; fi
+                g="$(docker exec "$cid" sh -c "pgrep -f '[K]FGameSteamServer.bin' | head -1" 2>/dev/null || true)"
+                echo "$((i * 5 - 5))s after the green: not answering; game pid ${g:-none}; $(docker inspect -f 'running={{.State.Running}} restarts={{.RestartCount}} health={{.State.Health.Status}}' "$cid")"
+                if [ "$i" = 1 ] || [ "$i" = 12 ]; then
+                  echo "--- the container's log, last 60 lines"
+                  $COMPOSE logs --no-color --tail 60 kf2-server | sed -E 's/7656[0-9]{13}/<steamid>/g; s/([0-9]{1,3}[.]){3}[0-9]{1,3}/<ip>/g' | cut -c1-220
+                  echo "--- Launch.log, last 40 lines"
+                  docker exec "$cid" sh -c 'tail -40 /data/serverfiles/KFGame/Logs/Launch.log' 2>&1 | sed -E 's/7656[0-9]{13}/<steamid>/g; s/([0-9]{1,3}[.]){3}[0-9]{1,3}/<ip>/g' | cut -c1-220
+                fi
+                sleep 5
+              done
+              docker exec "$cid" bash /healthcheck.sh 27015 || exit 1
+              exit 0
+            fi
             [ "$s" = unhealthy ] && break
             sleep 10
           done
@@ -123,6 +162,33 @@ jobs:
           echo "--- UDP sockets in the container"
           docker exec "$cid" cat /proc/net/udp
           exit 1
+
+      - name: Passwords set in the ini, as an operator sets them - the probe after the start, and after a restart
+        # LinuxGSM's details, which the image runs after every start, prints
+        # the passwords it finds in the ini. The server is stopped (it
+        # rewrites the ini on its way out), GamePassword and AdminPassword get
+        # a value each, it is started again, and the probe looks for both;
+        # then once more after a restart. (The compose file passes no secret,
+        # so before this there is nothing for the probe to look for.)
+        run: |
+          cid="$($COMPOSE ps -q kf2-server)"
+          $COMPOSE stop kf2-server >/dev/null
+          tests/fixtures/operator-password.sh
+          $COMPOSE start kf2-server >/dev/null
+          for _ in $(seq 1 60); do
+            [ "$(docker inspect "$cid" --format '{{.State.Health.Status}}')" = healthy ] && docker exec "$cid" bash /healthcheck.sh 27015 >/dev/null 2>&1 && break
+            sleep 5
+          done
+          docker exec "$cid" bash /healthcheck.sh 27015 || { echo "::error::the server did not answer after the restart"; exit 1; }
+          # details runs five seconds after the start and takes a few more
+          for _ in $(seq 1 30); do [ "$($COMPOSE logs --no-color kf2-server 2>/dev/null | grep -c 'Tail log files')" -ge 2 ] && break; sleep 2; done
+          tests/secret-probe.sh check "the first start with passwords in the ini"
+          # And once more after a restart.
+          $COMPOSE restart kf2-server >/dev/null
+          for _ in $(seq 1 60); do docker exec "$cid" bash /healthcheck.sh 27015 >/dev/null 2>&1 && break; sleep 5; done
+          docker exec "$cid" bash /healthcheck.sh 27015 || { echo "::error::the server did not answer after the second restart"; exit 1; }
+          for _ in $(seq 1 30); do [ "$($COMPOSE logs --no-color kf2-server 2>/dev/null | grep -c 'Tail log files')" -ge 3 ] && break; sleep 2; done
+          tests/secret-probe.sh check "after a restart"
 
       - name: Plant - the process that answers, stopped, keeps the old check green and turns this one red
         # The check up to v1.6.8 was pgrep for KFGameSteamServer.bin. SIGSTOP on the process that
@@ -155,8 +221,55 @@ jobs:
           done
           echo "::error::the game did not answer again after SIGCONT"; exit 1
 
+      - name: The probe sees what it looks for - a canary in a log and on two command lines
+        run: tests/secret-probe.sh selftest
+
+      - name: A crash - the game killed inside its running container; the timer brings it back
+        # Process 1 is the entrypoint, which outlives the game: after a crash
+        # the container stays up, Docker restarts nothing and the health check
+        # stays red. tools/kf2-idle-reset.sh, on its five-minute timer, sees
+        # LinuxGSM's started lock with no game process and restarts it. Here:
+        # a run before (nothing to do), SIGSEGV to the owner of UDP 27015 as
+        # its own user, a run that must restart it, the server answering
+        # again, and a run after that says nothing about it.
+        run: |
+          cid="$($COMPOSE ps -q kf2-server)"
+          rc=0; out="$(tools/kf2-idle-reset.sh 2>&1)" || rc=$?
+          echo "before: exit $rc: $out"
+          [ "$rc" = 0 ] || { echo "::error::the timer was not green before the crash"; exit 1; }
+          uids="$(docker exec "$cid" sh -c 'cat /proc/[0-9]*/status 2>/dev/null' | awk '/^Uid:/ { print $2 }' | sort -u)"
+          own=""; as=""
+          for u in $uids; do
+            own="$(docker exec -u "$u" -i "$cid" sh -s 27015 < tests/fixtures/port-owner.sh 2>/dev/null)" && { as="$u"; break; }
+          done
+          pid="$(awk 'NR == 1 { print $1 }' <<<"$own")"
+          [ -n "$pid" ] || { echo "::error::nobody owns UDP 27015"; exit 1; }
+          echo "SIGSEGV to pid $pid ($(awk 'NR == 1 { print $3 }' <<<"$own")) as uid $as"
+          docker exec -u "$as" "$cid" kill -SEGV "$pid"
+          for _ in $(seq 1 30); do docker exec "$cid" sh -c "pgrep -f '[K]FGameSteamServer.bin' >/dev/null" || break; sleep 2; done
+          sleep 30
+          echo "30 s after the game died: $(docker inspect -f 'running={{.State.Running}} restarts={{.RestartCount}} health={{.State.Health.Status}}' "$cid")"
+          rc=0; out="$(tools/kf2-idle-reset.sh 2>&1)" || rc=$?
+          echo "the run after the crash: exit $rc: $out"
+          if [ "$rc" != 0 ] || ! grep -q "restarted: the game was gone from its running container" <<<"$out"; then
+            echo "::error::the timer did not restart the crashed game"; exit 1
+          fi
+          for _ in $(seq 1 60); do docker exec "$cid" bash /healthcheck.sh 27015 >/dev/null 2>&1 && break; sleep 5; done
+          docker exec "$cid" bash /healthcheck.sh 27015 || { echo "::error::the game did not answer after the timer's restart"; exit 1; }
+          rc=0; out="$(tools/kf2-idle-reset.sh 2>&1)" || rc=$?
+          echo "the next run: exit $rc: $out"
+          if [ "$rc" != 0 ] || grep -q "gone\|restarted" <<<"$out"; then echo "::error::the timer acted again on a server that is back"; exit 1; fi
+          rm -f .kf2-idle-reset*
+
+      - name: A stop - timed, with its exit code (tests/clean-stop.sh; no world to save)
+        env:
+          CLEAN_STOP_PROJECT: kf2
+          CLEAN_STOP_COMPOSE: kf2-server-docker-compose.yml
+        run: tests/clean-stop.sh kf2-server -
+
       - name: Stop
         if: always()
         run: |
           $COMPOSE down -t 60 >/dev/null 2>&1 || true
+          rm -f "$RUNNER_TEMP/secret-probe.values" .env
           docker volume rm -f kf2-server-data >/dev/null 2>&1 || true

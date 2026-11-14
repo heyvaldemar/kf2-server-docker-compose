@@ -44,9 +44,11 @@ echo
 echo "=== both ways: the idle reset's own file rewritten under a running copy ==="
 echo
 # A copy of the script, a docker that takes two seconds to say a container is
-# running, and the takeover flag supplied, so the run ends in "nothing to do".
+# running (and, asked to inspect it, its name, id and a restart count of 0),
+# and the takeover flag supplied, so the run ends in "nothing to do".
 mkdir -p "$T/tools" "$T/bin"
-printf '#!/bin/sh\nsleep 2\necho 0123456789ab\n' >"$T/bin/docker"
+# shellcheck disable=SC2016   # the fake's own $1, written as text
+printf '#!/bin/sh\nsleep 2\ncase "$1" in inspect) echo "/kf2-kf2-server-1 0123456789ab 0 0001-01-01T00:00:00Z 2026-11-14T00:00:00Z" ;; *) echo 0123456789ab ;; esac\n' >"$T/bin/docker"
 cp tools/kf2-idle-reset.sh "$T/tools/wrapped.sh"
 # The same script without its braces: what every script here was before.
 awk -v n="$(wc -l <tools/kf2-idle-reset.sh)" 'NR == n { next } !done && $0 == "{" { done = 1; next } { print }' tools/kf2-idle-reset.sh >"$T/tools/unwrapped.sh"

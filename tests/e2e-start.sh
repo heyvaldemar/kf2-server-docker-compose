@@ -21,6 +21,15 @@
 # must finish within fifteen seconds. With npm's defaults it must still be
 # waiting at ninety, or the settings are not what saves the start.
 #
+# tools/start.sh, the entrypoint the compose file runs in front of the
+# image's, needs no game either. LinuxGSM's `details`, which the image runs
+# after every start, prints the passwords it finds in the server's ini; with
+# two set there (random, written on stdin), they must reach `docker logs`
+# masked, while the image's own entrypoint alone prints them (the control).
+# And a stop must still be LinuxGSM's: SIGTERM to process 1, "Stopping
+# kf2server" and LinuxGSM's last line in the log, exit 0, well inside the
+# grace period.
+#
 # The game itself is not installed: that is a 25 GB download.
 # shellcheck disable=SC2015   # pass and fail always exit 0, so "A && pass || fail" is if-then-else here
 set -uo pipefail
@@ -145,6 +154,72 @@ else
   [ "$rc" = 124 ] && pass "with npm's defaults: still waiting at ${secs}s, so the settings are what saves the start" \
     || fail "with npm's defaults it did not wait (exit ${rc:-?} after ${secs:-?}s): the settings are not what this test says"
 fi
+
+echo
+echo "=== tools/start.sh: no password in the log, and a stop is still LinuxGSM's ==="
+echo
+
+# Two passwords in the ini, as an operator sets them; on stdin, never argv.
+G="g$(openssl rand -hex 10)"; A="a$(openssl rand -hex 10)"
+printf '%s\n' "$G" "$A" >"$SCRATCH/values"
+pw_ini() {
+  fresh; installed
+  printf '[Engine.AccessControl]\nAdminPassword=%s\nGamePassword=%s\n[Engine.GameReplicationInfo]\nServerName=start test\n' "$A" "$G" \
+    | docker run --rm -i -v "$VOLUME:/data" --entrypoint sh "$IMAGE" -c \
+      'mkdir -p /data/serverfiles/KFGame/Config/kf2server && cat >/data/serverfiles/KFGame/Config/kf2server/LinuxServer-KFGame.ini && chown -R 1000:1000 /data'
+}
+# The image as the compose file runs it: no-new-privileges, the shipped
+# config, and (with "wrapped") tools/start.sh in front. Its own health check
+# off: it would run LinuxGSM's monitor, which the compose file replaces.
+up() {  # name, wrapped|bare
+  local name=$1 how=$2
+  set -- --no-healthcheck --security-opt no-new-privileges:true -e GAMESERVER=kf2server -e UID=1000 -e GID=1000 -e UPDATE_CHECK=0 \
+    -e NPM_CONFIG_AUDIT=false -e NPM_CONFIG_PREFER_OFFLINE=true -e NPM_CONFIG_FETCH_TIMEOUT=30000 -e NPM_CONFIG_FETCH_RETRIES=1 \
+    -v "$VOLUME:/data" -v "$SCRATCH/shipped.cfg:/data/config-lgsm/kf2server/kf2server.cfg"
+  if [ "$how" = wrapped ]; then
+    docker run -d --name "$name" "$@" --entrypoint /bin/bash -v "$PWD/tools/start.sh:/start.sh:ro" "$IMAGE" /start.sh >/dev/null
+  else
+    docker run -d --name "$name" "$@" "$IMAGE" >/dev/null
+  fi
+  for _ in $(seq 1 90); do docker logs "$name" 2>&1 | grep -q 'Tail log files' && return 0; sleep 2; done
+  return 1
+}
+C1="kf2-starttest-bare-$$"; C2="kf2-starttest-wrapped-$$"
+trap 'docker rm -f "$C1" "$C2" >/dev/null 2>&1; cleanup' EXIT
+
+# 5. The control: the image's own entrypoint prints both.
+pw_ini
+if up "$C1" bare; then
+  n="$(docker logs "$C1" 2>&1 | grep -c -F -f "$SCRATCH/values" || true)"
+  [ "$n" -ge 2 ] && pass "the image's own entrypoint: the passwords in its log, on $n lines (LinuxGSM's details)" \
+    || fail "the image's own entrypoint printed them on ${n:-0} lines; this test no longer shows what start.sh is for"
+else
+  fail "the image's own entrypoint never reached its tail of the logs"
+fi
+docker rm -f "$C1" >/dev/null 2>&1
+
+# 6. tools/start.sh in front: masked, process 1 is the script, and a stop is
+#    LinuxGSM's.
+pw_ini
+if up "$C2" wrapped; then
+  logs="$(docker logs "$C2" 2>&1)"
+  n="$(grep -c -F -f "$SCRATCH/values" <<<"$logs" || true)"
+  masked="$(grep -c -E '^(Server|Admin|Web Interface) password: +\*{8}$' <<<"$logs" || true)"
+  [ "$n" = 0 ] && [ "$masked" = 3 ] && pass "tools/start.sh: neither password in the log; the three password lines read ********" \
+    || fail "tools/start.sh: the passwords on ${n:-?} lines, ${masked:-0} of 3 lines masked"
+  p1="$(docker exec "$C2" sh -c 'tr "\0" " " </proc/1/cmdline')"
+  [[ $p1 == "/bin/bash /start.sh"* ]] && pass "process 1 is tools/start.sh" || fail "process 1 is: $p1"
+  since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  t0=$SECONDS; docker stop -t 60 "$C2" >/dev/null; secs=$((SECONDS - t0))
+  code="$(docker inspect -f '{{.State.ExitCode}}' "$C2")"
+  after="$(docker logs --since "$since" "$C2" 2>&1)"
+  [ "$code" = 0 ] && [ "$secs" -lt 50 ] && grep -q '^Stopping kf2server' <<<"$after" && grep -q 'STOP: PASS: core_exit.sh exiting with code: 0' <<<"$after" \
+    && pass "docker stop: LinuxGSM's stop ran and its last line reached the log, exit 0, ${secs}s of 60" \
+    || fail "docker stop: exit $code after ${secs}s; the log after the stop: $(tail -3 <<<"$after" | tr '\n' ' ')"
+else
+  fail "tools/start.sh never reached the image's tail of the logs: $(docker logs --tail 5 "$C2" 2>&1 | tr '\n' ' ')"
+fi
+docker rm -f "$C2" >/dev/null 2>&1
 
 echo
 echo "passed: $PASSED   failed: $FAILED"

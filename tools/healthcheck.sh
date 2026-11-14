@@ -37,7 +37,7 @@
 # firewall lets players in.
 #
 # Usage: healthcheck.sh [query port]   (default 27015). Needs bash, timeout, head,
-# od and tr, which the image has (tests/e2e-healthcheck.sh runs it there).
+# od, tr, cat and mktemp, which the image has (tests/e2e-healthcheck.sh runs it there).
 #
 # Read whole before it runs: one brace group, ending in exit
 # (bash reads a script as it runs it, so a file rewritten under a running
@@ -72,11 +72,21 @@ if [ "${#addrs[@]}" = 0 ]; then
 fi
 
 ask() {  # address, a printf format of the request -> the reply's first 9 bytes, in hex
-  { exec 3<>"/dev/udp/$1/$port"; } 2>/dev/null || return 0
+  # ONE DATAGRAM, ONE WRITE. bash writes printf's output line by line, so a
+  # request printed straight to the socket went out in two datagrams wherever
+  # it held a newline byte, and the server's challenge, echoed back, holds one
+  # now and then (0x0a in four random bytes). The request is written to a file
+  # and sent by one cat, one write().
+  local f
+  f=$(mktemp) || return 0
   # shellcheck disable=SC2059   # the request is a printf format on purpose: \xHH escapes
-  printf "$2" >&3
-  timeout 1.5 head -c 9 <&3 | od -An -v -tx1 | tr -d ' \n'
-  exec 3>&-
+  printf "$2" >"$f"
+  if { exec 3<>"/dev/udp/$1/$port"; } 2>/dev/null; then
+    cat "$f" >&3
+    timeout 1.5 head -c 9 <&3 | od -An -v -tx1 | tr -d ' \n'
+    exec 3>&-
+  fi
+  rm -f "$f"
 }
 
 for try in 1 2; do

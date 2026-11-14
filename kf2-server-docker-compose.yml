@@ -15,6 +15,9 @@ x-images:
 services:
   kf2-server:
     image: *kf2-server-image
+    # tools/start.sh, then the image's own entrypoint: no password in these
+    # logs, and Docker's stop still runs LinuxGSM's stop.
+    entrypoint: ["/bin/bash", "/start.sh"]
     # Handles untrusted input from the internet and cannot gain privileges
     # through a setuid binary.
     security_opt:
@@ -106,6 +109,10 @@ services:
       - kf2-server-data:/data
       # The health check: A2S_INFO to the query port (see healthcheck: below).
       - ./tools/healthcheck.sh:/healthcheck.sh:ro
+      # The entrypoint: LinuxGSM's details prints the passwords it finds in
+      # the server's ini after every start; this masks them on their way to
+      # `docker compose logs` (tools/start.sh).
+      - ./tools/start.sh:/start.sh:ro
       # THE SETTINGS LIVE OUTSIDE THE VOLUME, where git records their history
       # and a backup that skips 25 GB of replaceable game files still sees them.
       # LinuxGSM reads this file at start; the file it ships beside it,
