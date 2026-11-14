@@ -7,14 +7,16 @@
 #   tools/kf2-ban.sh remove <steam community id> unban; refused if anyone is playing
 #   tools/kf2-ban.sh queue                       the bans waiting for an empty server
 #
-# Either form of the id is accepted: 76561198042335367, or 0x0110000104E44887
+# Either form of the id is accepted: 76561201960265732, or 0x01100001EE6B2804
 # as the server's own chat log writes it. --force after the id applies at once
 # whoever is on.
+# (The ids in these comments and in the README are made up: account numbers
+# past four billion, which Steam has not handed out.)
 #
 # WHERE A BAN LIVES. One line per banned player under [Engine.AccessControl] in
 # LinuxServer-KFGame.ini, with the 64-bit id split into its two 32-bit halves:
 #     BannedIDs=(Uid=(A=<low 32 bits>,B=<high 32 bits>))
-# 76561198042335367 is A=82069639, B=17825793. B is 17825793 for every player
+# 76561201960265732 is A=-294967292, B=17825793. B is 17825793 for every player
 # account there is, which is how a number that is not a player id gets refused
 # here rather than written into a list it would never match.
 #

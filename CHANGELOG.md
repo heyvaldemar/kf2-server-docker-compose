@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Changed
+
+- **The example Steam IDs are made up.** The README, the comments in `tools/kf2-ban.sh` and `tests/e2e-moderation.sh` now use account numbers past four billion, which Steam has not handed out, in the one form the ban tool accepts (`B=17825793`). Their low half is past 2^31, so the test now expects `A` as the signed number the engine writes, which is how `kf2-ban.sh` has always written it.
 
 ## [1.8.1] - 2026-11-14
 

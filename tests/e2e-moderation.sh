@@ -95,11 +95,14 @@ fake_rm silent
 echo; echo "--- ban on an empty server: stop, edit, start, read back"
 [ "$(tools/kf2-ban.sh list)" = "nobody is banned" ] && pass "list: nobody is banned to begin with" || fail "list: $(tools/kf2-ban.sh list)"
 before=$(starts)
-out=$(tools/kf2-ban.sh add 76561198042335367 2>&1); rc=$?
-[ "$rc" = 0 ] && [ "$out" = "banned 76561198042335367" ] && pass "add: 'banned 76561198042335367', read back from the file the server rewrote" || fail "add exited $rc: $out"
+out=$(tools/kf2-ban.sh add 76561201960265732 2>&1); rc=$?
+[ "$rc" = 0 ] && [ "$out" = "banned 76561201960265732" ] && pass "add: 'banned 76561201960265732', read back from the file the server rewrote" || fail "add exited $rc: $out"
 wait_ready
-if ini_cat | awk '/^\[/ { sec = $0 } sec == "[Engine.AccessControl]" && $0 == "BannedIDs=(Uid=(A=82069639,B=17825793))" { ok = 1 } END { exit !ok }'; then
-  pass "the line is inside [Engine.AccessControl], with the id split into A=82069639,B=17825793"
+# The example ids are account numbers no Steam account has reached (over four
+# billion), so A, their low 32 bits, is past 2^31 and goes into the ini as the
+# signed 32-bit number the engine writes.
+if ini_cat | awk '/^\[/ { sec = $0 } sec == "[Engine.AccessControl]" && $0 == "BannedIDs=(Uid=(A=-294967292,B=17825793))" { ok = 1 } END { exit !ok }'; then
+  pass "the line is inside [Engine.AccessControl], with the id split into A=-294967292,B=17825793"
 else
   fail "the ban line is missing or in the wrong section:"; ini_cat | sed 's/^/        /'
 fi
@@ -109,10 +112,10 @@ else
   fail "the ban line landed after the section's blank line"
 fi
 [ "$(starts)" = "$((before + 1))" ] && pass "the server was restarted exactly once for it" || fail "starts went from $before to $(starts)"
-[ "$(tools/kf2-ban.sh list)" = "76561198042335367" ] && pass "list: the id, in decimal, whatever form the file uses" || fail "list: $(tools/kf2-ban.sh list)"
+[ "$(tools/kf2-ban.sh list)" = "76561201960265732" ] && pass "list: the id, in decimal, whatever form the file uses" || fail "list: $(tools/kf2-ban.sh list)"
 
 echo; echo "--- what is refused"
-out=$(tools/kf2-ban.sh add 0x0110000104E44887 2>&1); rc=$?
+out=$(tools/kf2-ban.sh add 0x01100001EE6B2804 2>&1); rc=$?
 [ "$rc" = 3 ] && [ "$out" = "already banned" ] && pass "the hex form the chat log writes is recognised as the same id: 'already banned', exit 3" || fail "hex add exited $rc: $out"
 before=$(starts)
 out=$(tools/kf2-ban.sh add 12345 2>&1); rc=$?
@@ -127,16 +130,16 @@ out=$(tools/kf2-ban.sh add abc 2>&1); rc=$?
 echo; echo "--- with players on, a ban waits"
 fake_set 2 players
 before=$(starts)
-out=$(tools/kf2-ban.sh add 76561198045356622 2>&1); rc=$?
-if [ "$rc" = 0 ] && printf '%s' "$out" | grep -q "^queued: 76561198045356622, 2 player(s) are on" && grep -q "^76561198045356622 " "$KF2_BAN_QUEUE" && [ "$(starts)" = "$before" ]; then
+out=$(tools/kf2-ban.sh add 76561201960265733 2>&1); rc=$?
+if [ "$rc" = 0 ] && printf '%s' "$out" | grep -q "^queued: 76561201960265733, 2 player(s) are on" && grep -q "^76561201960265733 " "$KF2_BAN_QUEUE" && [ "$(starts)" = "$before" ]; then
   pass "add with 2 on: queued, written down, nobody restarted"
 else
   fail "add with players on exited $rc: $out"
 fi
-[ "$(tools/kf2-ban.sh list)" = "76561198042335367" ] && pass "the file is untouched while it waits" || fail "list changed: $(tools/kf2-ban.sh list)"
-out=$(tools/kf2-ban.sh add 76561198045356622 2>&1)
+[ "$(tools/kf2-ban.sh list)" = "76561201960265732" ] && pass "the file is untouched while it waits" || fail "list changed: $(tools/kf2-ban.sh list)"
+out=$(tools/kf2-ban.sh add 76561201960265733 2>&1)
 printf '%s' "$out" | grep -q "^already queued" && pass "asking twice: 'already queued'" || fail "second add: $out"
-tools/kf2-ban.sh queue | grep -q "^76561198045356622 " && pass "queue: lists what is waiting" || fail "queue: $(tools/kf2-ban.sh queue)"
+tools/kf2-ban.sh queue | grep -q "^76561201960265733 " && pass "queue: lists what is waiting" || fail "queue: $(tools/kf2-ban.sh queue)"
 out=$(tools/kf2-ban-queue.sh --dry-run 2>&1); rc=$?
 [ "$rc" = 0 ] && [ "$out" = "2 player(s) on: 1 ban(s) stay queued" ] && [ "$(starts)" = "$before" ] && pass "the applier with 2 on: '$out'" || fail "applier with players on exited $rc: $out"
 
@@ -147,7 +150,7 @@ out=$(tools/kf2-ban-queue.sh --dry-run 2>&1); rc=$?
 # fails, and the tool must say the ban did not happen, with nothing written and
 # nobody restarted.
 mkdir -p "$SCRATCH/queue-is-a-directory"
-out=$(KF2_BAN_QUEUE="$SCRATCH/queue-is-a-directory" tools/kf2-ban.sh add 76561198000000003 2>&1); rc=$?
+out=$(KF2_BAN_QUEUE="$SCRATCH/queue-is-a-directory" tools/kf2-ban.sh add 76561201960265731 2>&1); rc=$?
 if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q "^NOT banned" && ! printf '%s' "$out" | grep -q "^queued" && [ "$(starts)" = "$before" ]; then
   pass "a queue that cannot be written: 'NOT banned', exit 1, nobody restarted"
 else
@@ -157,18 +160,18 @@ fi
 echo; echo "--- an unanswered query is not an empty server"
 fake_set 1 silent
 out=$(tools/kf2-ban-queue.sh 2>&1); rc=$?
-if [ "$rc" = 0 ] && printf '%s' "$out" | grep -q "did not answer" && grep -q "^76561198045356622 " "$KF2_BAN_QUEUE" && [ "$(starts)" = "$before" ]; then
+if [ "$rc" = 0 ] && printf '%s' "$out" | grep -q "did not answer" && grep -q "^76561201960265733 " "$KF2_BAN_QUEUE" && [ "$(starts)" = "$before" ]; then
   pass "the applier: '$out'"
 else
   fail "applier on a silent server exited $rc: $out"
 fi
-out=$(tools/kf2-ban.sh add 76561198000000002 2>&1); rc=$?
-if [ "$rc" = 0 ] && printf '%s' "$out" | grep -q "not answering" && grep -q "^76561198000000002 " "$KF2_BAN_QUEUE" && [ "$(starts)" = "$before" ]; then
+out=$(tools/kf2-ban.sh add 76561201960265730 2>&1); rc=$?
+if [ "$rc" = 0 ] && printf '%s' "$out" | grep -q "not answering" && grep -q "^76561201960265730 " "$KF2_BAN_QUEUE" && [ "$(starts)" = "$before" ]; then
   pass "a fresh ban on a silent server is queued too, not applied on a guess"
 else
   fail "add on a silent server exited $rc: $out"
 fi
-out=$(tools/kf2-ban.sh remove 76561198042335367 2>&1); rc=$?
+out=$(tools/kf2-ban.sh remove 76561201960265732 2>&1); rc=$?
 [ "$rc" = 1 ] && printf '%s' "$out" | grep -q -- "--force" && pass "and lifting one is refused, with --force named as the way past" || fail "remove on a silent server exited $rc: $out"
 fake_rm silent
 
@@ -176,7 +179,7 @@ echo; echo "--- the server empties: the queue applies, and says where it was ask
 fake_set 0 players
 before=$(starts)
 out=$(KF2_MODERATION_WEBHOOK=http://127.0.0.1:9/nothing-listens-here tools/kf2-ban-queue.sh 2>"$SCRATCH/err"); rc=$?
-if printf '%s' "$out" | grep -q "^applied:" && printf '%s' "$out" | grep -q "^76561198045356622 (waited" && printf '%s' "$out" | grep -q "^76561198000000002 (waited"; then
+if printf '%s' "$out" | grep -q "^applied:" && printf '%s' "$out" | grep -q "^76561201960265733 (waited" && printf '%s' "$out" | grep -q "^76561201960265730 (waited"; then
   pass "both queued bans applied, each read back after its own restart"
 else
   fail "applier exited $rc: $out"; cat "$SCRATCH/err"
@@ -184,7 +187,7 @@ fi
 wait_ready
 [ "$(starts)" = "$((before + 2))" ] && pass "one restart per ban, on purpose: $before -> $(starts)" || fail "starts went from $before to $(starts)"
 [ ! -s "$KF2_BAN_QUEUE" ] && pass "the queue is empty afterwards" || fail "queue still holds: $(cat "$KF2_BAN_QUEUE")"
-[ "$(tools/kf2-ban.sh list | sort | tr '\n' ' ')" = "76561198000000002 76561198042335367 76561198045356622 " ] && pass "list: all three" || fail "list: $(tools/kf2-ban.sh list | tr '\n' ' ')"
+[ "$(tools/kf2-ban.sh list | sort | tr '\n' ' ')" = "76561201960265730 76561201960265732 76561201960265733 " ] && pass "list: all three" || fail "list: $(tools/kf2-ban.sh list | tr '\n' ' ')"
 if [ "$rc" = 1 ] && grep -q "notify FAILED: HTTP 000" "$SCRATCH/err"; then
   pass "a webhook nobody answers is said out loud and fails the run: exit 1, 'notify FAILED'"
 else
@@ -220,7 +223,7 @@ s.serve_forever()' "$SCRATCH/hook.paths" "$SCRATCH/hook.port" &
 hookpid=$!
 for _ in $(seq 1 40); do [ -s "$SCRATCH/hook.port" ] && break; sleep 0.25; done
 fake_set 1 players
-tools/kf2-ban.sh add 76561198000000003 >/dev/null 2>&1
+tools/kf2-ban.sh add 76561201960265731 >/dev/null 2>&1
 fake_set 0 players
 out=$(PATH="$SCRATCH/bin:$PATH" KF2_MODERATION_WEBHOOK="http://127.0.0.1:$(cat "$SCRATCH/hook.port")/hooks/$KEY" tools/kf2-ban-queue.sh 2>"$SCRATCH/err"); rc=$?
 kill "$hookpid" 2>/dev/null
@@ -230,36 +233,36 @@ if [ "$rc" = 0 ] && grep -qx "/hooks/$KEY" "$SCRATCH/hook.paths" 2>/dev/null && 
 else
   fail "webhook delivery: exit $rc, posts to: $(tr '\n' ' ' <"$SCRATCH/hook.paths" 2>/dev/null), the address among curl's arguments: $(grep -c "$KEY" "$SCRATCH/curl.argv" 2>/dev/null), stderr: $(cat "$SCRATCH/err")"
 fi
-tools/kf2-ban.sh remove 76561198000000003 >/dev/null 2>&1
+tools/kf2-ban.sh remove 76561201960265731 >/dev/null 2>&1
 wait_ready
 
 echo; echo "--- the read-back notices what the server did not keep"
-fake_set 76561198000000001 drop-on-start
-out=$(tools/kf2-ban.sh add 76561198000000001 2>&1); rc=$?
-if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q "^NOT BANNED after add: the server dropped 76561198000000001"; then
+fake_set 76561201960265729 drop-on-start
+out=$(tools/kf2-ban.sh add 76561201960265729 2>&1); rc=$?
+if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q "^NOT BANNED after add: the server dropped 76561201960265729"; then
   pass "an id the server dropped at startup is reported as NOT BANNED, exit 1"
 else
   fail "dropped-id add exited $rc: $out"
 fi
 wait_ready
-tools/kf2-ban.sh list | grep -q "^76561198000000001$" && fail "list still shows the dropped id" || pass "and list does not show it"
+tools/kf2-ban.sh list | grep -q "^76561201960265729$" && fail "list still shows the dropped id" || pass "and list does not show it"
 
 echo; echo "--- unban"
-out=$(tools/kf2-ban.sh remove 76561198042335367 2>&1); rc=$?
-[ "$rc" = 0 ] && [ "$out" = "unbanned 76561198042335367" ] && pass "remove on an empty server: 'unbanned', read back" || fail "remove exited $rc: $out"
+out=$(tools/kf2-ban.sh remove 76561201960265732 2>&1); rc=$?
+[ "$rc" = 0 ] && [ "$out" = "unbanned 76561201960265732" ] && pass "remove on an empty server: 'unbanned', read back" || fail "remove exited $rc: $out"
 wait_ready
 before=$(starts)
-out=$(tools/kf2-ban.sh remove 76561198042335367 2>&1); rc=$?
+out=$(tools/kf2-ban.sh remove 76561201960265732 2>&1); rc=$?
 [ "$rc" = 3 ] && [ "$out" = "not in the ban list" ] && pass "removing it again: 'not in the ban list', exit 3" || fail "second remove exited $rc: $out"
 [ "$(starts)" = "$before" ] && pass "and nothing to change means no restart: the list was read first" || fail "a no-op remove restarted the server: $before -> $(starts)"
-out=$(tools/kf2-ban.sh add 76561198045356622 2>&1); rc=$?
+out=$(tools/kf2-ban.sh add 76561201960265733 2>&1); rc=$?
 [ "$rc" = 3 ] && [ "$(starts)" = "$before" ] && pass "same for a ban already in the file" || fail "a no-op add exited $rc or restarted: $out"
 fake_set 1 players
 before=$(starts)
-out=$(tools/kf2-ban.sh remove 76561198045356622 2>&1); rc=$?
+out=$(tools/kf2-ban.sh remove 76561201960265733 2>&1); rc=$?
 [ "$rc" = 1 ] && printf '%s' "$out" | grep -q "1 player(s) are on" && [ "$(starts)" = "$before" ] && pass "remove with 1 on: refused, no restart" || fail "remove with a player on exited $rc: $out"
-out=$(tools/kf2-ban.sh remove 76561198045356622 --force 2>&1); rc=$?
-[ "$rc" = 0 ] && [ "$out" = "unbanned 76561198045356622" ] && pass "--force: applied at once, with a player on, because it was asked twice" || fail "forced remove exited $rc: $out"
+out=$(tools/kf2-ban.sh remove 76561201960265733 --force 2>&1); rc=$?
+[ "$rc" = 0 ] && [ "$out" = "unbanned 76561201960265733" ] && pass "--force: applied at once, with a player on, because it was asked twice" || fail "forced remove exited $rc: $out"
 wait_ready
 fake_set 0 players
 
@@ -274,7 +277,7 @@ with open(p, "wb") as f: f.write(b.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n
 PY
 total=$(ini_cat | wc -l | tr -d ' '); crlf=$(ini_cat | grep -c $'\r$')
 [ "$total" = "$crlf" ] && [ "$total" -gt 0 ] && pass "the file is CRLF throughout before the edit ($crlf of $total)" || fail "the fixture did not become CRLF: $crlf of $total"
-out=$(tools/kf2-ban.sh add 76561198042335367 2>&1); rc=$?
+out=$(tools/kf2-ban.sh add 76561201960265732 2>&1); rc=$?
 [ "$rc" = 0 ] && pass "add on a CRLF file: banned" || fail "add on a CRLF file exited $rc: $out"
 wait_ready
 total=$(ini_cat | wc -l | tr -d ' '); crlf=$(ini_cat | grep -c $'\r$')
@@ -282,7 +285,7 @@ total=$(ini_cat | wc -l | tr -d ' '); crlf=$(ini_cat | grep -c $'\r$')
 
 echo; echo "--- an edit that cannot be made"
 compose run --rm --no-deps -T --user 1000:1000 --entrypoint sh kf2-server -c "printf '[Engine.GameInfo]\nMaxPlayers=6\n' > $INI" >/dev/null 2>&1
-out=$(tools/kf2-ban.sh add 76561198000000003 2>&1); rc=$?
+out=$(tools/kf2-ban.sh add 76561201960265731 2>&1); rc=$?
 [ "$rc" = 1 ] && printf '%s' "$out" | grep -q "could not find \[Engine.AccessControl\]" && pass "no [Engine.AccessControl]: said plainly, exit 1" || fail "add without the section exited $rc: $out"
 wait_ready && pass "and the server it stopped for the edit is running again" || fail "the server was left stopped after a failed edit"
 

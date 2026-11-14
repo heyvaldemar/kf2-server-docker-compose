@@ -76,8 +76,8 @@ Killing Floor 2 has no rcon, and WebAdmin cannot be used without a password that
 tools/kf2-a2s.sh players                 # how many are on, or nothing at all if the server did not answer
 tools/kf2-a2s.sh who                     # names, score and minutes; A2S carries no ids
 tools/kf2-ban.sh list                    # who is banned, as Steam community ids
-tools/kf2-ban.sh add 76561198042335367   # or 0x0110000104E44887, as the chat log writes it
-tools/kf2-ban.sh remove 76561198042335367
+tools/kf2-ban.sh add 76561201960265732   # a made-up id; or 0x01100001EE6B2804, as the chat log writes it
+tools/kf2-ban.sh remove 76561201960265732
 tools/kf2-ban.sh queue                   # what is waiting for an empty server
 tools/kf2-ban-queue.sh --dry-run         # what the applier would do right now
 ```
@@ -100,7 +100,7 @@ or one line in the crontab of a user who can run `docker compose`:
 
 Nothing queued is silent. A ban that applies, and a ban that fails and stays queued, are both printed, and both are posted to `KF2_MODERATION_WEBHOOK` when `.env` names a Mattermost or Slack incoming webhook: the news belongs where the request came from, not in a host log. A webhook that does not answer is reported and fails the run rather than being assumed delivered.
 
-**Where the id comes from.** A2S carries names only. The id a ban needs is in the chat log the server writes under `KFGame/Logs/Chatlog_*.log` inside the volume, one tab-separated line per message with the player's id as `0x0110000104E44887`, which `add` accepts as it is. That log exists only when two switches in `KFWebAdmin.ini` are both on, `bChatLog` under `[WebAdmin.WebAdmin]` and `bEnabled` under `[WebAdmin.Chatlog]`; the second alone writes nothing, and the log needs no WebAdmin login. On the machine this template comes from, a bot follows that log into a chat channel and posts a card with a ban button; the button runs `tools/kf2-ban.sh add` with the id from the line, and the queue's own message closes the loop in the same channel.
+**Where the id comes from.** A2S carries names only. The id a ban needs is in the chat log the server writes under `KFGame/Logs/Chatlog_*.log` inside the volume, one tab-separated line per message with the player's id as `0x01100001EE6B2804`, which `add` accepts as it is. That log exists only when two switches in `KFWebAdmin.ini` are both on, `bChatLog` under `[WebAdmin.WebAdmin]` and `bEnabled` under `[WebAdmin.Chatlog]`; the second alone writes nothing, and the log needs no WebAdmin login. On the machine this template comes from, a bot follows that log into a chat channel and posts a card with a ban button; the button runs `tools/kf2-ban.sh add` with the id from the line, and the queue's own message closes the loop in the same channel.
 
 **Is it listed?** `tools/kf2-listed.sh <public address> [query port]` asks Steam whether a server at that address is in its list: exit 0 listed, 1 not listed, 2 Steam did not answer, which is not the same thing as not listed. Steam drops a server for a minute or two after any restart, including the one `kf2-ban.sh` does, so one miss means nothing; act only when the server has been missing for a span of time, say fifteen minutes, with no listed answer in between, and cap whatever acts. A count of misses depends on how often something asks.
 
