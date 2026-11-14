@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.8.2] - 2026-11-14
+
 ### Changed
 
 - **The example Steam IDs are made up.** The README, the comments in `tools/kf2-ban.sh` and `tests/e2e-moderation.sh` now use account numbers past four billion, which Steam has not handed out, in the one form the ban tool accepts (`B=17825793`). Their low half is past 2^31, so the test now expects `A` as the signed number the engine writes, which is how `kf2-ban.sh` has always written it.
@@ -319,7 +323,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.1...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.2...HEAD
+[1.8.2]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.7.0...v1.7.1
