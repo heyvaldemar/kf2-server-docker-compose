@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.8.3] - 2026-11-21
+
 ### Security
 
 - **`gameservermanagers/gameserver:kf2` was rebuilt upstream**; the pin moved from `sha256:6e35af1b5ca2…` to `sha256:9b2bdfa08084…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.
@@ -325,7 +329,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite. It deliberately does not boot the game: the first start is a 25 GB
   download.
 
-[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.2...HEAD
+[Unreleased]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.3...HEAD
+[1.8.3]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.2...v1.8.3
 [1.8.2]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/heyvaldemar/kf2-server-docker-compose/compare/v1.7.1...v1.8.0
